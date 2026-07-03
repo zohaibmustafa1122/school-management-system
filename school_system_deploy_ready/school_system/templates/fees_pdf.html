@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Fees Report — {{ school_name }}</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;color:#0f172a;background:#fff}
+.page{max-width:900px;margin:0 auto;padding:28px 36px}
+.header{display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid #1e3a8a;padding-bottom:14px;margin-bottom:20px}
+.brand{display:flex;align-items:center;gap:12px}
+.brand-logo{width:46px;height:46px;background:#1e3a8a;color:#fff;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;letter-spacing:-1px}
+.brand-name{font-size:18px;font-weight:800;color:#1e3a8a}.brand-sub{font-size:11px;color:#64748b;margin-top:1px}
+.report-meta{text-align:right}.report-meta h2{font-size:16px;font-weight:700;color:#1e3a8a}.report-meta .gen{font-size:11px;color:#64748b;margin-top:3px}
+.summary{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px}
+.sc{border:1px solid #e2e8f0;border-radius:8px;padding:10px 14px;text-align:center}
+.sc .sv{font-size:18px;font-weight:800}.sc .sl{font-size:10px;color:#64748b;margin-top:2px;text-transform:uppercase;letter-spacing:.4px}
+.sc.blue{border-top:3px solid #3b82f6}.sc.blue .sv{color:#3b82f6}
+.sc.green{border-top:3px solid #10b981}.sc.green .sv{color:#10b981}
+.sc.red{border-top:3px solid #ef4444}.sc.red .sv{color:#ef4444}
+.sc.amber{border-top:3px solid #f59e0b}.sc.amber .sv{color:#f59e0b}
+.section-title{font-size:12px;font-weight:700;color:#1e3a8a;border-left:4px solid #1e3a8a;padding-left:8px;margin:14px 0 8px}
+table{width:100%;border-collapse:collapse;margin-bottom:14px}
+thead th{background:#1e3a8a;color:#fff;padding:7px 10px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+tbody td{padding:6px 10px;border-bottom:1px solid #f1f5f9;font-size:11px}
+tbody tr:nth-child(even){background:#f8fafc}
+.bp{background:#dcfce7;color:#166534;padding:1px 7px;border-radius:9px;font-size:10px;font-weight:700}
+.ba{background:#fef9c3;color:#854d0e;padding:1px 7px;border-radius:9px;font-size:10px;font-weight:700}
+.br{background:#fee2e2;color:#991b1b;padding:1px 7px;border-radius:9px;font-size:10px;font-weight:700}
+.footer{margin-top:24px;border-top:1px solid #e2e8f0;padding-top:12px;display:flex;justify-content:space-between;font-size:10px;color:#94a3b8}
+.print-btn{position:fixed;bottom:20px;right:20px;background:#1e3a8a;color:#fff;border:none;padding:10px 20px;border-radius:9px;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.2)}
+@media print{.print-btn{display:none}body{print-color-adjust:exact;-webkit-print-color-adjust:exact}}
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="header">
+    <div class="brand">
+      <div class="brand-logo">{{ school_short }}</div>
+      <div><div class="brand-name">{{ school_name }}</div><div class="brand-sub">Fees Collection Report</div></div>
+    </div>
+    <div class="report-meta">
+      <h2>Fee Statement{% if cls_filter %} — Class {{ cls_filter }}{% endif %}{% if month_filter %} — {{ month_filter }}{% endif %}</h2>
+      <div class="gen">Generated: {{ generated }}</div>
+    </div>
+  </div>
+
+  {% set paid_count = records|selectattr('status','equalto','Paid')|list|length %}
+  {% set pend_count = records|selectattr('status','equalto','Pending')|list|length %}
+  <div class="summary">
+    <div class="sc blue"><div class="sv">{{ records|length }}</div><div class="sl">Records</div></div>
+    <div class="sc green"><div class="sv">Rs {{ "{:,.0f}".format(total_paid) }}</div><div class="sl">Collected</div></div>
+    <div class="sc red"><div class="sv">Rs {{ "{:,.0f}".format(total_due) }}</div><div class="sl">Outstanding</div></div>
+    <div class="sc amber"><div class="sv">{{ pend_count }}</div><div class="sl">Pending</div></div>
+  </div>
+
+  <div class="section-title">Fee Records</div>
+  <table>
+    <thead><tr><th>#</th><th>Student</th><th>Roll</th><th>Class</th><th>Month</th><th>Total (Rs)</th><th>Paid (Rs)</th><th>Due (Rs)</th><th>Status</th><th>Due Date</th></tr></thead>
+    <tbody>
+    {% for r in records %}
+    <tr>
+      <td>{{ loop.index }}</td>
+      <td><strong>{{ r.name }}</strong></td>
+      <td>{{ r.roll_number }}</td>
+      <td>{{ r.class }}</td>
+      <td>{{ r.month }}</td>
+      <td>{{ "{:,.0f}".format(r.total_amount) }}</td>
+      <td><strong>{{ "{:,.0f}".format(r.paid_amount) }}</strong></td>
+      <td>{{ "{:,.0f}".format(r.due_amount) }}</td>
+      <td><span class="{{ 'bp' if r.status=='Paid' else ('ba' if r.status=='Partial' else 'br') }}">{{ r.status }}</span></td>
+      <td>{{ r.due_date or '—' }}</td>
+    </tr>
+    {% endfor %}
+    <tr style="background:#f8fafc;font-weight:700;border-top:2px solid #e2e8f0">
+      <td colspan="5" style="text-align:right;padding-right:10px">TOTAL</td>
+      <td>{{ "{:,.0f}".format(total_billed) }}</td>
+      <td>{{ "{:,.0f}".format(total_paid) }}</td>
+      <td>{{ "{:,.0f}".format(total_due) }}</td>
+      <td colspan="2"></td>
+    </tr>
+    </tbody>
+  </table>
+
+  <div class="footer">
+    <div>{{ school_name }} · Fees Report</div>
+    <div>{{ generated }}</div>
+  </div>
+</div>
+<button class="print-btn" onclick="window.print()">🖨️ Print / Save PDF</button>
+</body>
+</html>

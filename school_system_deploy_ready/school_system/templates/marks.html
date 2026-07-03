@@ -1,0 +1,351 @@
+{% extends "base.html" %}
+{% block title %}Marks Portal — {{ school_name }}{% endblock %}
+{% block page_title %}Marks Portal{% endblock %}
+{% block content %}
+
+{# Class selector #}
+<div class="card" style="margin-bottom:16px">
+  <div class="card-hd"><h3>Select Class</h3></div>
+  <div style="padding:14px 20px">
+    {% if session.role == 'admin' %}
+    <form method="GET" id="classForm" style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">
+      <div class="fgroup" style="min-width:180px">
+        <label>Class</label>
+        <select name="class" id="classSelect" onchange="document.getElementById('classForm').submit()">
+          <option value="">— Select Class —</option>
+          {% for c in classes %}<option value="{{ c.class }}" {% if sel_class==c.class %}selected{% endif %}>{{ c.class }}</option>{% endfor %}
+        </select>
+      </div>
+    </form>
+    {% else %}
+    <div style="display:flex;align-items:center;gap:12px">
+      <div class="cls-badge-lg">{{ sel_class }}</div>
+      <span class="text-muted" style="font-size:13px">Your assigned class</span>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+{% if sel_class %}
+
+{# Subject cards #}
+<div class="card" style="margin-bottom:16px" id="subjCard">
+  <div class="card-hd">
+    <h3>Subjects — Class {{ sel_class }}</h3>
+    {% if session.role in ['admin','teacher'] %}
+    <button class="btn btn-sm btn-primary" onclick="openModal('addSubjInlineModal')">+ Add Subject</button>
+    {% endif %}
+  </div>
+  {% if subjects %}
+  <div style="padding:14px 20px">
+    <div class="subj-card-grid" id="subjGrid">
+      {% for sub in subject_summaries %}
+      <div class="subj-sel-card" id="sc-{{ sub.id }}" onclick="selectSubject({{ sub.id }}, '{{ sub.subject_name }}')">
+        <div class="ssc-icon">📚</div>
+        <div class="ssc-name">{{ sub.subject_name }}</div>
+        <div class="ssc-stats">
+          {% for et, cnt in sub.exam_counts.items() %}
+          <span class="ssc-pill {% if cnt > 0 %}ssc-filled{% endif %}" id="pill-{{ sub.id }}-{{ et }}">{{ et[:3] }}: {{ cnt }}</span>
+          {% endfor %}
+        </div>
+        {% if session.role in ['admin','teacher'] %}
+        <div class="ssc-del" onclick="event.stopPropagation()">
+          <form method="POST" action="{{ url_for('delete_subject', sub_id=sub.id) }}"
+                onsubmit="return confirm('Delete {{ sub.subject_name }}? All marks will be deleted.')">
+            <button type="submit" class="btn btn-xs btn-danger">✕</button>
+          </form>
+        </div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% else %}
+  <div class="empty-state"><div class="ei">📚</div><p>No subjects for class {{ sel_class }}.</p></div>
+  {% endif %}
+</div>
+
+{# Marks panel — shown/hidden by JS #}
+<div id="marksPanel" style="display:none">
+  <div class="card">
+    <div class="card-hd">
+      <div>
+        <h3 id="marksPanelTitle">—</h3>
+        <div class="sub-text">Select an exam type to view or enter marks</div>
+      </div>
+      <button class="btn btn-sm btn-ghost" onclick="closeMarksPanel()" title="Close">✕ Close</button>
+    </div>
+    <div class="exam-tabs" id="examTabs">
+      {% for et in exam_types %}
+      <button class="exam-tab" id="tab-{{ et }}" onclick="selectExam('{{ et }}')">{{ et }}</button>
+      {% endfor %}
+    </div>
+    <div id="marksBody">
+      <div style="padding:32px;text-align:center;color:var(--muted)">
+        <div style="font-size:32px;margin-bottom:8px">👆</div>
+        <p>Click an exam type above</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% else %}
+<div class="card"><div class="empty-state"><div class="ei">📊</div><p>Select a class above to begin.</p></div></div>
+{% endif %}
+
+{# Add Subject Modal #}
+<div class="modal-ov" id="addSubjInlineModal">
+  <div class="modal">
+    <div class="modal-hd"><h3>Add Subject to Class {{ sel_class }}</h3><button class="modal-x" onclick="closeModal('addSubjInlineModal')">✕</button></div>
+    <form method="POST" action="{{ url_for('add_subject') }}" style="padding:20px 24px">
+      <input type="hidden" name="class" value="{{ sel_class }}">
+      <div class="fgroup"><label>Subject Name</label>
+        <input type="text" name="subject_name" required placeholder="e.g. Chemistry, Computer Science"></div>
+      <div class="modal-foot">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('addSubjInlineModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Add Subject</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{# Hidden save form — submitted via JS #}
+<form method="POST" action="{{ url_for('save_marks') }}" id="saveMarksForm" style="display:none">
+  <input type="hidden" name="class"      id="fm_class"   value="{{ sel_class }}">
+  <input type="hidden" name="subject_id" id="fm_subject">
+  <input type="hidden" name="exam_type"  id="fm_exam">
+  <input type="hidden" name="total_marks" id="fm_total">
+  <div id="fm_inputs"></div>
+</form>
+
+{% endblock %}
+{% block scripts %}
+<script>
+const SEL_CLASS   = "{{ sel_class }}";
+const IS_EDITOR   = {{ 'true' if session.role in ['admin','teacher'] else 'false' }};
+const EXAM_TYPES  = {{ exam_types | tojson }};
+let   activeSubjId   = null;
+let   activeSubjName = null;
+let   activeExam     = null;
+let   totalMarks     = 100;
+
+/* ── SELECT SUBJECT (no page reload) ─────────────────────── */
+function selectSubject(subId, subName) {
+  // Deactivate old
+  document.querySelectorAll('.subj-sel-card').forEach(c => c.classList.remove('active'));
+  // Activate new
+  const card = document.getElementById('sc-' + subId);
+  if (card) card.classList.add('active');
+
+  activeSubjId   = subId;
+  activeSubjName = subName;
+  activeExam     = null;
+
+  document.getElementById('marksPanelTitle').textContent = subName;
+  document.getElementById('marksPanel').style.display = 'block';
+
+  // Reset tabs
+  EXAM_TYPES.forEach(et => {
+    const t = document.getElementById('tab-' + et);
+    if (t) t.classList.remove('active');
+  });
+
+  // Clear body
+  document.getElementById('marksBody').innerHTML = `
+    <div style="padding:32px;text-align:center;color:var(--muted)">
+      <div style="font-size:32px;margin-bottom:8px">👆</div>
+      <p>Click an exam type above to load marks</p>
+    </div>`;
+
+  // Scroll to panel without jump (smooth)
+  setTimeout(() => {
+    document.getElementById('marksPanel').scrollIntoView({behavior:'smooth', block:'nearest'});
+  }, 50);
+}
+
+/* ── SELECT EXAM (AJAX load) ──────────────────────────────── */
+async function selectExam(et) {
+  if (!activeSubjId) return;
+  activeExam = et;
+
+  // Update tabs
+  EXAM_TYPES.forEach(e => {
+    const t = document.getElementById('tab-' + e);
+    if (t) t.classList.toggle('active', e === et);
+  });
+
+  // Show loading
+  document.getElementById('marksBody').innerHTML = `
+    <div style="padding:28px;text-align:center;color:var(--muted)">
+      <div style="font-size:24px;margin-bottom:8px">⏳</div><p>Loading marks…</p>
+    </div>`;
+
+  try {
+    const r = await fetch(`/api/marks_data?class=${encodeURIComponent(SEL_CLASS)}&subject=${activeSubjId}&exam_type=${encodeURIComponent(et)}`);
+    const rows = await r.json();
+    renderMarksTable(rows, et);
+  } catch(e) {
+    document.getElementById('marksBody').innerHTML = '<div class="empty-state"><p>Error loading marks. Please try again.</p></div>';
+  }
+}
+
+/* ── RENDER MARKS TABLE ───────────────────────────────────── */
+function renderMarksTable(rows, et) {
+  if (!rows.length) {
+    document.getElementById('marksBody').innerHTML = '<div class="empty-state"><div class="ei">👥</div><p>No students in this class.</p></div>';
+    return;
+  }
+
+  // Detect existing total_marks
+  const existingTotal = rows.find(r => r.total_marks) ;
+  totalMarks = existingTotal ? existingTotal.total_marks : 100;
+
+  let html = '';
+
+  if (IS_EDITOR) {
+    html += `
+    <div style="padding:10px 18px;background:#fafbfc;border-bottom:1px solid var(--bdr);display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <label style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin:0">Total Marks:</label>
+      <input type="number" id="totalMarksInput" value="${totalMarks}" min="1" max="1000"
+        style="width:80px;padding:6px 10px;border:1.5px solid var(--bdr);border-radius:8px;font-family:inherit;font-size:13px"
+        oninput="totalMarks=parseFloat(this.value)||100;rows.forEach&&refreshLiveAll()">
+      <span class="text-muted" style="font-size:12px">Max marks per student</span>
+      <div style="margin-left:auto;display:flex;gap:8px">
+        <button type="button" class="btn btn-outline btn-sm" onclick="toggleAllChecks()">☑ Toggle All</button>
+        <button type="button" class="btn btn-primary btn-sm" onclick="submitMarks()">💾 Save Marks</button>
+      </div>
+    </div>`;
+  }
+
+  html += `<div class="tw"><table class="tbl" id="marksTable"><thead><tr>`;
+  if (IS_EDITOR) html += `<th style="width:40px"><input type="checkbox" id="mMaster" onchange="toggleAllChecksM(this)" style="width:15px;height:15px;cursor:pointer"></th>`;
+  html += `<th>#</th><th>Name</th><th>Roll</th>`;
+  if (IS_EDITOR) html += `<th>Marks Obtained</th><th>Live Score</th><th></th>`;
+  else           html += `<th>Marks</th><th>Total</th><th>%</th><th>Grade</th>`;
+  html += `</tr></thead><tbody>`;
+
+  rows.forEach((s, i) => {
+    const hasMarks = s.marks_obtained !== null && s.marks_obtained !== undefined;
+    const pct = hasMarks && s.total_marks ? Math.round(s.marks_obtained/s.total_marks*100*10)/10 : 0;
+    const warnCls = hasMarks && pct < 40 ? 'row-warn' : '';
+
+    html += `<tr class="${warnCls}" id="mrow-${s.id}">`;
+    if (IS_EDITOR) {
+      const liveHtml = hasMarks
+        ? `<span class="badge ${pct>=60?'bg':pct>=40?'bo':'br'}">${s.marks_obtained}/${s.total_marks} (${pct}%)</span>`
+        : `<span class="text-muted">—</span>`;
+      html += `
+        <td><input type="checkbox" class="mcheck" checked style="width:15px;height:15px;cursor:pointer"></td>
+        <td class="text-muted">${i+1}</td>
+        <td><strong>${s.name}</strong></td>
+        <td><code>${s.roll_number}</code></td>
+        <td><input type="number" class="marks-input" data-sid="${s.id}"
+              value="${hasMarks ? s.marks_obtained : ''}" min="0" step="0.5" placeholder="—"
+              style="width:88px;padding:6px 10px;border:1.5px solid var(--bdr);border-radius:7px;font-family:inherit;font-size:13px"
+              oninput="updateLive(this, ${s.id})"></td>
+        <td id="live-${s.id}">${liveHtml}</td>
+        <td>${s.mid ? `<form method="POST" action="/marks/delete/${s.mid}" style="display:inline" onsubmit="return confirm('Delete mark for ${s.name}?')"><button type="submit" class="btn btn-xs btn-danger">✕</button></form>` : ''}</td>`;
+    } else {
+      const g = pct>=80?'A':pct>=60?'B':pct>=40?'C':'F';
+      html += `
+        <td class="text-muted">${i+1}</td>
+        <td><strong>${s.name}</strong></td>
+        <td><code>${s.roll_number}</code></td>
+        <td>${hasMarks ? s.marks_obtained : '—'}</td>
+        <td>${s.total_marks || '—'}</td>
+        <td>${hasMarks ? pct+'%' : '—'}</td>
+        <td><span class="grade-pill g${g}">${g}</span></td>`;
+    }
+    html += `</tr>`;
+  });
+
+  html += `</tbody></table></div>`;
+  if (IS_EDITOR) {
+    const filled = rows.filter(r => r.marks_obtained !== null).length;
+    html += `<div class="att-foot">
+      <div class="text-muted" id="marksSummary">${filled} of ${rows.length} students have marks</div>
+      <button type="button" class="btn btn-primary" onclick="submitMarks()">💾 Save All Marks →</button>
+    </div>`;
+  }
+
+  document.getElementById('marksBody').innerHTML = html;
+  // Re-attach live listeners
+  document.querySelectorAll('.marks-input').forEach(inp => {
+    inp.addEventListener('input', updateSummary);
+  });
+}
+
+/* ── LIVE SCORE UPDATE ────────────────────────────────────── */
+function updateLive(input, sid) {
+  const total = parseFloat(document.getElementById('totalMarksInput')?.value) || totalMarks;
+  let val = parseFloat(input.value);
+  const cell = document.getElementById('live-' + sid);
+  if (!cell) return;
+  if (isNaN(val) || input.value.trim() === '') { cell.innerHTML = '<span class="text-muted">—</span>'; updateSummary(); return; }
+  if (val > total) { val = total; input.value = total; }
+  const pct = Math.round(val/total*100*10)/10;
+  const cls = pct>=60?'bg':pct>=40?'bo':'br';
+  cell.innerHTML = `<span class="badge ${cls}">${val}/${total} (${pct}%)</span>`;
+  updateSummary();
+}
+function updateSummary() {
+  const inputs = document.querySelectorAll('.marks-input');
+  const filled = [...inputs].filter(i => i.value.trim()!=='').length;
+  const el = document.getElementById('marksSummary');
+  if (el) el.textContent = `${filled} of ${inputs.length} students have marks`;
+}
+
+/* ── TOGGLE CHECKBOXES ────────────────────────────────────── */
+function toggleAllChecksM(master) {
+  document.querySelectorAll('.mcheck').forEach(c => c.checked = master.checked);
+}
+function toggleAllChecks() {
+  const cbs = document.querySelectorAll('.mcheck');
+  const allOn = [...cbs].every(c=>c.checked);
+  cbs.forEach(c => c.checked = !allOn);
+  const m = document.getElementById('mMaster');
+  if (m) m.checked = !allOn;
+}
+
+/* ── SUBMIT MARKS (programmatic form submit) ─────────────── */
+function submitMarks() {
+  const tm = parseFloat(document.getElementById('totalMarksInput')?.value) || totalMarks;
+  document.getElementById('fm_class').value   = SEL_CLASS;
+  document.getElementById('fm_subject').value = activeSubjId;
+  document.getElementById('fm_exam').value    = activeExam;
+  document.getElementById('fm_total').value   = tm;
+
+  const container = document.getElementById('fm_inputs');
+  container.innerHTML = '';
+  document.querySelectorAll('.marks-input').forEach(inp => {
+    if (inp.value.trim() === '') return;
+    const h = document.createElement('input');
+    h.type = 'hidden';
+    h.name = 'marks_' + inp.dataset.sid;
+    h.value = inp.value;
+    container.appendChild(h);
+  });
+  document.getElementById('saveMarksForm').submit();
+}
+
+/* ── CLOSE PANEL ──────────────────────────────────────────── */
+function closeMarksPanel() {
+  document.getElementById('marksPanel').style.display = 'none';
+  document.querySelectorAll('.subj-sel-card').forEach(c=>c.classList.remove('active'));
+  activeSubjId = null; activeExam = null;
+}
+
+/* ── CLASS DROPDOWN REFRESH ───────────────────────────────── */
+(async () => {
+  try {
+    const r = await fetch('/api/classes');
+    const names = await r.json();
+    document.querySelectorAll('select[name="class"]').forEach(sel => {
+      const cur = sel.value;
+      const first = sel.options[0]?.outerHTML||'';
+      sel.innerHTML = first + names.map(n=>`<option value="${n}" ${n===cur?'selected':''}>${n}</option>`).join('');
+    });
+  } catch(e) {}
+})();
+</script>
+{% endblock %}

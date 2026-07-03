@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}My Attendance — {{ school_name }}{% endblock %}
+{% block page_title %}My Attendance{% endblock %}
+{% block content %}
+<div class="stats-row">
+  <div class="scard blue"><div class="scard-icon">📅</div><div class="scard-val">{{ total }}</div><div class="scard-lbl">Total Days</div></div>
+  <div class="scard green"><div class="scard-icon">✅</div><div class="scard-val">{{ present }}</div><div class="scard-lbl">Present</div></div>
+  <div class="scard red"><div class="scard-icon">❌</div><div class="scard-val">{{ total - present }}</div><div class="scard-lbl">Absent</div></div>
+  <div class="scard {{ 'green' if pct>=75 else 'amber' if pct>=50 else 'red' }}"><div class="scard-icon">📊</div><div class="scard-val">{{ pct }}%</div><div class="scard-lbl">Attendance Rate</div></div>
+</div>
+{% if pct < 75 %}<div class="alert-banner">⚠️ Your attendance is {{ pct }}%. Minimum required is 75%.</div>{% endif %}
+<div class="grid-2">
+  <div class="card">
+    <div class="card-hd"><h3>Monthly Trend</h3></div>
+    <div class="chart-box"><canvas id="monthChart"></canvas></div>
+  </div>
+  <div class="card">
+    <div class="card-hd"><h3>Attendance Records</h3></div>
+    <div style="max-height:340px;overflow-y:auto">
+      <table class="tbl">
+        <thead><tr><th>Date</th><th>Status</th></tr></thead>
+        <tbody>
+        {% for r in records %}
+        <tr class="{% if r.status=='Absent' %}row-warn{% endif %}">
+          <td>{{ r.date }}</td>
+          <td><span class="badge {{ 'bg' if r.status=='Present' else 'br' }}">{{ r.status }}</span></td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const mL={{ monthly|map(attribute='month')|list|tojson }};
+const mP={{ monthly|list|tojson }}.map(m=>Math.round(m.present/m.total*100));
+new Chart(document.getElementById('monthChart'),{type:'line',data:{labels:mL,datasets:[{label:'Attendance %',data:mP,borderColor:'#3b82f6',backgroundColor:'rgba(59,130,246,0.1)',fill:true,tension:0.4,pointRadius:5,pointBackgroundColor:'#3b82f6'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,max:100,ticks:{callback:v=>v+'%'}},x:{grid:{display:false}}}}});
+</script>
+{% endblock %}

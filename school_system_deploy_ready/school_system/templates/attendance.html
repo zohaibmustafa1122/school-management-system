@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% block title %}Attendance — {{ school_name }}{% endblock %}
+{% block page_title %}Mark Attendance{% endblock %}
+{% block content %}
+<div class="card">
+  <div class="card-hd"><h3>Select Class & Date</h3></div>
+  <form method="GET" style="padding:20px" class="filter-row">
+    {% if session.role == 'admin' %}
+    <div class="fgroup">
+      <label>Class</label>
+      <select name="class" onchange="this.form.submit()">
+        <option value="">— Select —</option>
+        {% for c in classes %}<option value="{{ c.class }}" {% if sel_class==c.class %}selected{% endif %}>{{ c.class }}</option>{% endfor %}
+      </select>
+    </div>
+    {% endif %}
+    <div class="fgroup">
+      <label>Date</label>
+      <input type="date" name="date" value="{{ sel_date }}" onchange="this.form.submit()">
+    </div>
+    {% if session.role == 'teacher' %}
+    <input type="hidden" name="class" value="{{ sel_class }}">
+    {% endif %}
+  </form>
+</div>
+
+{% if sel_class and students %}
+<form method="POST" action="{{ url_for('submit_attendance') }}" id="attForm">
+  <input type="hidden" name="class" value="{{ sel_class }}">
+  <input type="hidden" name="date" value="{{ sel_date }}">
+  <div class="card">
+    <div class="card-hd">
+      <div>
+        <h3>Class {{ sel_class }} &mdash; {{ sel_date }}</h3>
+        <div class="sub-text" id="attSummary">— students marked</div>
+      </div>
+      <div class="btn-group">
+        <button type="button" class="btn btn-sm btn-outline" onclick="markAll(true)">✓ All Present</button>
+        <button type="button" class="btn btn-sm btn-outline-red" onclick="markAll(false)">✗ All Absent</button>
+        <button type="submit" class="btn btn-primary btn-sm">Save Attendance</button>
+      </div>
+    </div>
+    <div class="att-grid">
+      {% for s in students %}
+      <div class="att-tile {% if s.status=='Present' %}at-p{% elif s.status=='Absent' %}at-a{% endif %}" id="tile-{{ s.id }}" onclick="toggleTile({{ s.id }})">
+        <div class="at-av">{{ s.name[0]|upper }}</div>
+        <div class="at-info">
+          <div class="at-name">{{ s.name }}</div>
+          <code class="at-roll">{{ s.roll_number }}</code>
+        </div>
+        <div class="at-check">
+          <input type="checkbox" name="present" value="{{ s.id }}" id="c{{ s.id }}"
+            {% if s.status=='Present' or s.status is none %}checked{% endif %}
+            onclick="event.stopPropagation(); updateTile({{ s.id }}); updateSummary()">
+          <label for="c{{ s.id }}" class="at-label" onclick="event.stopPropagation()">
+            <span class="al-p">✓ Present</span><span class="al-a">✗ Absent</span>
+          </label>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    <div class="att-foot">
+      <div id="attSummary2" class="att-summary-text"></div>
+      <div class="btn-group">
+        <form method="POST" action="{{ url_for('reset_attendance') }}" style="display:inline" onsubmit="return confirm('Reset all attendance for this class/date?')">
+          <input type="hidden" name="class" value="{{ sel_class }}">
+          <input type="hidden" name="date" value="{{ sel_date }}">
+          <button type="submit" class="btn btn-sm btn-danger">Reset</button>
+        </form>
+        <button type="submit" class="btn btn-primary">Save Attendance →</button>
+      </div>
+    </div>
+  </div>
+</form>
+{% elif sel_class %}
+<div class="card"><div class="empty-state"><div class="ei">👥</div><p>No students in class {{ sel_class }}.</p></div></div>
+{% else %}
+<div class="card"><div class="empty-state"><div class="ei">📋</div><p>Select a class to begin.</p></div></div>
+{% endif %}
+{% endblock %}
+{% block scripts %}
+<script>
+// Refresh class dropdown from API so new classes appear immediately
+async function refreshClasses() {
+  try {
+    const r = await fetch('/api/classes');
+    const names = await r.json();
+    document.querySelectorAll('select[name="class"]').forEach(sel => {
+      const cur = sel.value;
+      const firstOpt = sel.options[0].outerHTML; // keep "— Select —"
+      sel.innerHTML = firstOpt + names.map(n=>`<option value="${n}" ${n===cur?'selected':''}>${n}</option>`).join('');
+    });
+  } catch(e) {}
+}
+refreshClasses();
+</script>
+<script>
+function toggleTile(id){
+  const c=document.getElementById('c'+id);
+  c.checked=!c.checked; updateTile(id); updateSummary();
+}
+function updateTile(id){
+  const c=document.getElementById('c'+id);
+  const t=document.getElementById('tile-'+id);
+  t.className='att-tile '+(c.checked?'at-p':'at-a');
+}
+function markAll(p){
+  document.querySelectorAll('[id^="c"]').forEach(c=>{c.checked=p;updateTile(c.value);});
+  updateSummary();
+}
+function updateSummary(){
+  const total=document.querySelectorAll('[id^="c"]').length;
+  const present=document.querySelectorAll('[id^="c"]:checked').length;
+  const t=`${present} of ${total} present`;
+  const el=document.getElementById('attSummary2');
+  if(el) el.textContent=t;
+}
+document.querySelectorAll('[id^="c"]').forEach(c=>{ c.addEventListener('change',()=>{updateTile(c.value);updateSummary();}); updateTile(c.value); });
+updateSummary();
+</script>
+{% endblock %}

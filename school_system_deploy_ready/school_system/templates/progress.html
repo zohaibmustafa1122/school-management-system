@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% block title %}Student Progress — {{ school_name }}{% endblock %}
+{% block page_title %}Student Progress{% endblock %}
+{% block content %}
+<div class="card">
+  <div class="card-hd"><h3>Select Student</h3></div>
+  <form method="GET" style="padding:20px" class="filter-row">
+    {% if session.role == 'admin' %}
+    <div class="fgroup">
+      <label>Class</label>
+      <select name="class" id="clsSel" onchange="loadStudents(this.value); this.form.submit()">
+        <option value="">— Class —</option>
+        {% for c in classes %}<option value="{{ c.class }}" {% if sel_class==c.class %}selected{% endif %}>{{ c.class }}</option>{% endfor %}
+      </select>
+    </div>
+    {% else %}
+    <input type="hidden" name="class" value="{{ sel_class }}">
+    {% endif %}
+    <div class="fgroup">
+      <label>Student</label>
+      <select name="student_id" onchange="this.form.submit()">
+        <option value="">— Select Student —</option>
+        {% for s in students_list %}<option value="{{ s.id }}" {% if sel_student==s.id|string %}selected{% endif %}>{{ s.name }} ({{ s.roll_number }})</option>{% endfor %}
+      </select>
+    </div>
+  </form>
+</div>
+
+{% if progress_data %}
+{% set p = progress_data %}
+<div class="progress-header">
+  <div class="ph-av">{{ p.student.name[0]|upper }}</div>
+  <div class="ph-info">
+    <h2>{{ p.student.name }}</h2>
+    <div class="ph-meta">Roll: <code>{{ p.student.roll_number }}</code> · Class: <span class="cls-badge">{{ p.student.class }}</span></div>
+  </div>
+  <div class="ph-grade grade-{{ p.grade.lower() }}">{{ p.grade }}</div>
+  <a href="{{ url_for('student_report_pdf', sid=p.student.id) }}" class="btn btn-primary" target="_blank">⬇ PDF Report</a>
+</div>
+
+<div class="stats-row">
+  <div class="scard blue"><div class="scard-icon">📊</div><div class="scard-val">{{ p.overall_avg }}%</div><div class="scard-lbl">Overall Marks</div></div>
+  <div class="scard {{ 'green' if p.att_pct>=75 else 'red' }}"><div class="scard-icon">✅</div><div class="scard-val">{{ p.att_pct }}%</div><div class="scard-lbl">Attendance</div></div>
+  <div class="scard amber"><div class="scard-icon">📅</div><div class="scard-val">{{ p.present_att }}/{{ p.total_att }}</div><div class="scard-lbl">Days Present</div></div>
+  <div class="scard purple"><div class="scard-icon">🏆</div><div class="scard-val">Grade {{ p.grade }}</div><div class="scard-lbl">Final Grade</div></div>
+</div>
+
+<div class="grid-2">
+  <div class="card">
+    <div class="card-hd"><h3>Subject Performance</h3></div>
+    <div class="chart-box"><canvas id="subjRadar"></canvas></div>
+  </div>
+  <div class="card">
+    <div class="card-hd"><h3>Marks Breakdown</h3></div>
+    <div class="tw">
+      <table class="tbl">
+        <thead><tr><th>Subject</th><th>Avg %</th><th>Grade</th></tr></thead>
+        <tbody>
+        {% for s in p.subj_summary %}
+        {% set pct = s.avg_pct|round(1) %}
+        {% set g = 'A' if pct>=80 else ('B' if pct>=60 else ('C' if pct>=40 else 'F')) %}
+        <tr>
+          <td><strong>{{ s.subject_name }}</strong></td>
+          <td>
+            <div class="prog-wrap"><div class="prog {{ 'pg-green' if pct>=60 else 'pg-red' }}" style="width:{{ pct }}%"></div></div>
+            {{ pct }}%
+          </td>
+          <td><span class="grade-pill g{{ g }}">{{ g }}</span></td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-hd"><h3>All Marks Records</h3></div>
+  <div class="tw">
+    <table class="tbl">
+      <thead><tr><th>Subject</th><th>Exam Type</th><th>Marks</th><th>Total</th><th>%</th><th>Grade</th></tr></thead>
+      <tbody>
+      {% for m in p.marks %}
+      {% set g = 'A' if m.pct>=80 else ('B' if m.pct>=60 else ('C' if m.pct>=40 else 'F')) %}
+      <tr class="{% if m.pct < 40 %}row-warn{% endif %}">
+        <td>{{ m.subject_name }}</td>
+        <td><span class="etype">{{ m.exam_type }}</span></td>
+        <td><strong>{{ m.marks_obtained }}</strong></td>
+        <td>{{ m.total_marks }}</td>
+        <td>{{ m.pct }}%</td>
+        <td><span class="grade-pill g{{ g }}">{{ g }}</span></td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% elif sel_class %}
+<div class="card"><div class="empty-state"><div class="ei">📊</div><p>Select a student to view their progress.</p></div></div>
+{% else %}
+<div class="card"><div class="empty-state"><div class="ei">📊</div><p>Select a class and student to begin.</p></div></div>
+{% endif %}
+{% endblock %}
+{% block scripts %}
+{% if progress_data %}
+<script>
+const sLabels = {{ progress_data.subj_summary|map(attribute='subject_name')|list|tojson }};
+const sPcts   = {{ progress_data.subj_summary|list|tojson }}.map(s=>Math.round(s.avg_pct*10)/10);
+new Chart(document.getElementById('subjRadar'),{
+  type:'radar',
+  data:{labels:sLabels,datasets:[{label:'Performance %',data:sPcts,fill:true,backgroundColor:'rgba(59,130,246,0.15)',borderColor:'#3b82f6',pointBackgroundColor:'#3b82f6',pointRadius:5}]},
+  options:{responsive:true,maintainAspectRatio:false,scales:{r:{beginAtZero:true,max:100,ticks:{stepSize:20}}},plugins:{legend:{display:false}}}
+});
+</script>
+{% endif %}
+
+// Refresh class dropdowns from API
+(async () => {
+  try {
+    const r = await fetch('/api/classes');
+    const names = await r.json();
+    document.querySelectorAll('select[name="class"], select[name="class_assigned"]').forEach(sel => {
+      const cur = sel.value;
+      const opts = [...sel.options];
+      const firstOpt = opts[0] ? opts[0].outerHTML : '';
+      sel.innerHTML = firstOpt + names.map(n=>`<option value="${n}" ${n===cur?'selected':''}>${n}</option>`).join('');
+    });
+  } catch(e) {}
+})();
+{% endblock %}

@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Attendance Report — Class {{ sel_class }} — {{ school_name }}</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;color:#0f172a;background:#fff}
+.page{max-width:860px;margin:0 auto;padding:28px 36px}
+.header{display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid #1e3a8a;padding-bottom:14px;margin-bottom:20px}
+.school-brand{display:flex;align-items:center;gap:14px}
+.brand-logo{width:52px;height:52px;background:#1e3a8a;color:#fff;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:900;letter-spacing:-1px;flex-shrink:0}
+.brand-name{font-size:20px;font-weight:800;color:#1e3a8a}
+.brand-sub{font-size:11px;color:#64748b;margin-top:2px}
+.report-meta{text-align:right}
+.report-meta h2{font-size:17px;font-weight:700;color:#1e3a8a}
+.report-meta .gen{font-size:11px;color:#64748b;margin-top:4px}
+.info-box{background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px 18px;margin-bottom:18px;display:flex;gap:30px;flex-wrap:wrap}
+.ib{display:flex;flex-direction:column}
+.ib label{font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:#64748b;font-weight:700}
+.ib .val{font-size:15px;font-weight:700;margin-top:2px}
+.summary-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px}
+.sc{border:1px solid #e2e8f0;border-radius:8px;padding:10px 14px;text-align:center}
+.sc .sv{font-size:20px;font-weight:800}
+.sc .sl{font-size:10px;color:#64748b;margin-top:2px;text-transform:uppercase;letter-spacing:.4px}
+.sc.blue{border-top:3px solid #3b82f6}.sc.blue .sv{color:#3b82f6}
+.sc.green{border-top:3px solid #10b981}.sc.green .sv{color:#10b981}
+.sc.red{border-top:3px solid #ef4444}.sc.red .sv{color:#ef4444}
+.sc.amber{border-top:3px solid #f59e0b}.sc.amber .sv{color:#f59e0b}
+.section-title{font-size:13px;font-weight:700;color:#1e3a8a;border-left:4px solid #1e3a8a;padding-left:10px;margin:16px 0 10px}
+table{width:100%;border-collapse:collapse;margin-bottom:16px}
+thead th{background:#1e3a8a;color:#fff;padding:8px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+tbody td{padding:7px 12px;border-bottom:1px solid #f1f5f9;font-size:12px}
+tbody tr:nth-child(even){background:#f8fafc}
+tbody tr:last-child td{border-bottom:none}
+.prog-wrap{height:5px;background:#e2e8f0;border-radius:3px;width:80px;display:inline-block;vertical-align:middle;margin-right:6px;overflow:hidden}
+.prog{height:100%;border-radius:3px}
+.pg-g{background:#10b981}.pg-r{background:#ef4444}.pg-a{background:#f59e0b}
+.badge-p{background:#dcfce7;color:#166534;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700}
+.badge-a{background:#fee2e2;color:#991b1b;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700}
+.badge-ok{background:#f0fdf4;color:#166534;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700}
+.badge-low{background:#fef9c3;color:#854d0e;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700}
+.badge-crit{background:#fef2f2;color:#991b1b;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700}
+.warn-row{background:#fffbeb!important}
+.footer{margin-top:28px;border-top:1px solid #e2e8f0;padding-top:14px;display:flex;justify-content:space-between;font-size:11px;color:#94a3b8}
+.print-btn{position:fixed;bottom:20px;right:20px;background:#1e3a8a;color:#fff;border:none;padding:11px 22px;border-radius:9px;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.2)}
+.page-break{page-break-before:always}
+@media print{.print-btn{display:none}body{print-color-adjust:exact;-webkit-print-color-adjust:exact}.page{padding:14px 18px}}
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="header">
+    <div class="school-brand">
+      <div class="brand-logo">{{ school_short }}</div>
+      <div>
+        <div class="brand-name">{{ school_name }}</div>
+        <div class="brand-sub">Attendance Report</div>
+      </div>
+    </div>
+    <div class="report-meta">
+      <h2>Attendance Report — Class {{ sel_class }}</h2>
+      <div class="gen">Generated: {{ generated }}</div>
+    </div>
+  </div>
+
+  <div class="info-box">
+    <div class="ib"><label>Class</label><div class="val">{{ sel_class }}</div></div>
+    <div class="ib"><label>Total Students</label><div class="val">{{ results|length }}</div></div>
+    {% if date_from %}<div class="ib"><label>From Date</label><div class="val">{{ date_from }}</div></div>{% endif %}
+    {% if date_to %}<div class="ib"><label>To Date</label><div class="val">{{ date_to }}</div></div>{% endif %}
+    <div class="ib"><label>Report Date</label><div class="val">{{ generated[:11] }}</div></div>
+  </div>
+
+  <!-- Summary stats -->
+  {% set total_students = results|length %}
+  {% set good_att = results|selectattr('pct','>=',75)|list|length %}
+  {% set low_att = results|selectattr('pct','<',75)|list|length %}
+  {% set avg_att = (results|map(attribute='pct')|list|sum / total_students)|round(1) if total_students else 0 %}
+  <div class="summary-row">
+    <div class="sc blue"><div class="sv">{{ total_students }}</div><div class="sl">Total Students</div></div>
+    <div class="sc green"><div class="sv">{{ avg_att }}%</div><div class="sl">Class Average</div></div>
+    <div class="sc green"><div class="sv">{{ good_att }}</div><div class="sl">Regular (≥75%)</div></div>
+    <div class="sc red"><div class="sv">{{ low_att }}</div><div class="sl">Irregular (&lt;75%)</div></div>
+  </div>
+
+  <!-- Main attendance table -->
+  <div class="section-title">📋 Student Attendance Summary</div>
+  <table>
+    <thead>
+      <tr><th>#</th><th>Name</th><th>Roll</th><th>Total Days</th><th>Present</th><th>Absent</th><th>Percentage</th><th>Status</th></tr>
+    </thead>
+    <tbody>
+    {% for r in results %}
+    <tr class="{{ 'warn-row' if r.pct < 75 else '' }}">
+      <td>{{ loop.index }}</td>
+      <td><strong>{{ r.name }}</strong></td>
+      <td>{{ r.roll }}</td>
+      <td>{{ r.total }}</td>
+      <td><strong>{{ r.present }}</strong></td>
+      <td>{{ r.total - r.present }}</td>
+      <td>
+        <div class="prog-wrap"><div class="prog {{ 'pg-g' if r.pct>=75 else ('pg-a' if r.pct>=50 else 'pg-r') }}" style="width:{{ r.pct }}%"></div></div>
+        <strong>{{ r.pct }}%</strong>
+      </td>
+      <td>
+        {% if r.pct >= 75 %}<span class="badge-ok">Regular</span>
+        {% elif r.pct >= 50 %}<span class="badge-low">Low</span>
+        {% else %}<span class="badge-crit">Critical</span>{% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+
+  <!-- Per-student monthly breakdown -->
+  <div class="section-title page-break">📅 Monthly Breakdown per Student</div>
+  {% for r in results %}
+  <div style="margin-bottom:14px;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden">
+    <div style="background:{{ '#1e3a8a' if r.pct>=75 else '#991b1b' }};color:#fff;padding:7px 14px;display:flex;align-items:center;justify-content:space-between">
+      <strong>{{ r.name }}</strong>
+      <span style="font-size:12px;opacity:.85">Roll: {{ r.roll }} &nbsp;|&nbsp; Overall: {{ r.pct }}% &nbsp;|&nbsp; {{ r.present }}/{{ r.total }} days</span>
+    </div>
+    <table>
+      <thead style="background:#f1f5f9!important">
+        <tr><th>Month</th><th>Days Present</th><th>Total Days</th><th>Monthly %</th><th>Status</th></tr>
+      </thead>
+      <tbody>
+      {% if r.monthly %}
+        {% for m in r.monthly %}
+        {% set mpct = ((m.present/m.total)*100)|round(1) if m.total else 0 %}
+        <tr>
+          <td>{{ m.month }}</td>
+          <td><strong>{{ m.present }}</strong></td>
+          <td>{{ m.total }}</td>
+          <td>{{ mpct }}%</td>
+          <td><span class="{{ 'badge-p' if mpct>=75 else 'badge-a' }}">{{ 'Regular' if mpct>=75 else 'Irregular' }}</span></td>
+        </tr>
+        {% endfor %}
+      {% else %}
+        <tr><td colspan="5" style="text-align:center;color:#94a3b8">No attendance records</td></tr>
+      {% endif %}
+      </tbody>
+    </table>
+  </div>
+  {% endfor %}
+
+  <div class="footer">
+    <div>{{ school_name }} · Academic Year 2024-25</div>
+    <div>{{ generated }}</div>
+  </div>
+</div>
+<button class="print-btn" onclick="window.print()">🖨️ Print / Save PDF</button>
+</body>
+</html>

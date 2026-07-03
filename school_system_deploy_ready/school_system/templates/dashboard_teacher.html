@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Teacher Dashboard — {{ school_name }}{% endblock %}
+{% block page_title %}Class {{ cls }} Dashboard{% endblock %}
+{% block content %}
+<div class="stats-row">
+  <div class="scard blue"><div class="scard-icon">👥</div><div class="scard-val">{{ total_students }}</div><div class="scard-lbl">My Students</div></div>
+  <div class="scard green"><div class="scard-icon">📈</div><div class="scard-val">{{ avg_att }}%</div><div class="scard-lbl">Avg Attendance</div></div>
+  <div class="scard amber"><div class="scard-icon">⚠️</div><div class="scard-val">{{ low_att|length }}</div><div class="scard-lbl">Low Attendance</div></div>
+  <div class="scard purple"><div class="scard-icon">📚</div><div class="scard-val">{{ subj_avgs|length }}</div><div class="scard-lbl">Subjects</div></div>
+</div>
+
+<div class="grid-2">
+  <div class="card">
+    <div class="card-hd"><h3>Subject Performance</h3>
+      <a href="{{ url_for('marks') }}" class="btn btn-sm btn-outline">Enter Marks</a>
+    </div>
+    <div class="chart-box"><canvas id="subjChart"></canvas></div>
+  </div>
+  <div class="card">
+    <div class="card-hd"><h3>Recent ClassBoard</h3>
+      <a href="{{ url_for('classboard') }}" class="btn btn-sm btn-primary">View All</a>
+    </div>
+    <div class="diary-list">
+      {% for e in diary %}
+      <div class="diary-item">
+        <span class="dtype dtype-{{ e.type.lower() }}">{{ e.type }}</span>
+        <div class="diary-body">
+          <div class="diary-title">{{ e.title }}</div>
+          <div class="diary-meta">{{ e.class }} · {{ e.created_at[:10] }}{% if e.due_date %} · Due: {{ e.due_date }}{% endif %}</div>
+        </div>
+      </div>
+      {% else %}<div class="empty-sm">No entries yet.</div>{% endfor %}
+    </div>
+  </div>
+</div>
+
+{% if low_att %}
+<div class="card">
+  <div class="card-hd"><h3>⚠️ Students with Low Attendance <span class="badge br">Below 75%</span></h3></div>
+  <div class="tw">
+    <table class="tbl">
+      <thead><tr><th>Name</th><th>Roll</th><th>Attendance %</th><th>Status</th></tr></thead>
+      <tbody>
+      {% for s in low_att %}
+      <tr class="row-warn">
+        <td><strong>{{ s.name }}</strong></td>
+        <td><code>{{ s.roll }}</code></td>
+        <td>
+          <div class="prog-wrap"><div class="prog pg-red" style="width:{{ s.pct }}%"></div></div>
+          <span class="text-red"><strong>{{ s.pct }}%</strong></span>
+        </td>
+        <td><span class="badge br">Low</span></td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+{% block scripts %}
+<script>
+const sLabels = {{ subj_avgs|map(attribute='subject_name')|list|tojson }};
+const sPcts   = {{ subj_avgs|map(attribute='avg_pct')|list|map('round',1)|list|tojson }};
+new Chart(document.getElementById('subjChart'),{
+  type:'bar',
+  data:{labels:sLabels,datasets:[{label:'Avg %',data:sPcts,backgroundColor:'#3b82f6',borderRadius:8}]},
+  options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+    scales:{y:{beginAtZero:true,max:100,ticks:{callback:v=>v+'%'},grid:{color:'#f1f5f9'}},x:{grid:{display:false}}}}
+});
+</script>
+{% endblock %}

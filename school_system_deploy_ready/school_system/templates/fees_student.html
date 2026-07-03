@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}My Fees — {{ school_name }}{% endblock %}
+{% block page_title %}My Fee Details{% endblock %}
+{% block content %}
+<div class="student-welcome" style="margin-bottom:16px">
+  <div class="sw-avatar">{{ student.name[0]|upper }}</div>
+  <div class="sw-info">
+    <h2>{{ student.name }}</h2>
+    <div class="sw-meta">Roll: <code>{{ student.roll_number }}</code> · Class: <span class="cls-badge" style="background:rgba(255,255,255,.2);color:#fff">{{ student.class }}</span></div>
+  </div>
+</div>
+
+<div class="stats-row" style="margin-bottom:16px">
+  <div class="scard blue"><div class="scard-icon">💰</div><div class="scard-body"><div class="scard-val">Rs {{ "{:,.0f}".format(total_fees) }}</div><div class="scard-lbl">Total Billed</div></div></div>
+  <div class="scard green"><div class="scard-icon">✅</div><div class="scard-body"><div class="scard-val">Rs {{ "{:,.0f}".format(total_paid) }}</div><div class="scard-lbl">Amount Paid</div></div></div>
+  <div class="scard {{ 'red' if total_due > 0 else 'green' }}"><div class="scard-icon">⚠️</div><div class="scard-body"><div class="scard-val">Rs {{ "{:,.0f}".format(total_due) }}</div><div class="scard-lbl">Amount Due</div></div></div>
+  <div class="scard amber"><div class="scard-icon">📋</div><div class="scard-body"><div class="scard-val">{{ fee_records|length }}</div><div class="scard-lbl">Months</div></div></div>
+</div>
+
+{% if total_due > 0 %}
+<div class="alert-banner">⚠️ You have Rs {{ "{:,.0f}".format(total_due) }} in outstanding fees. Please contact the school administration.</div>
+{% endif %}
+
+<div class="card">
+  <div class="card-hd"><h3>Fee Records</h3></div>
+  {% if fee_records %}
+  <div class="tw">
+    <table class="tbl">
+      <thead><tr><th>Month</th><th>Total (Rs)</th><th>Paid (Rs)</th><th>Due (Rs)</th><th>Status</th><th>Due Date</th><th>Notes</th></tr></thead>
+      <tbody>
+      {% for r in fee_records %}
+      {% set due = r.total_amount - r.paid_amount %}
+      <tr class="{% if r.status=='Pending' %}row-warn{% endif %}">
+        <td><strong>{{ r.month }}</strong></td>
+        <td>{{ "{:,.0f}".format(r.total_amount) }}</td>
+        <td class="text-green"><strong>{{ "{:,.0f}".format(r.paid_amount) }}</strong></td>
+        <td class="{{ 'text-red' if due > 0 else '' }}">{{ "{:,.0f}".format(due) }}</td>
+        <td>
+          {% if r.status=='Paid' %}<span class="badge bg">Paid</span>
+          {% elif r.status=='Partial' %}<span class="badge bo">Partial</span>
+          {% else %}<span class="badge br">Pending</span>{% endif %}
+        </td>
+        <td>{{ r.due_date or '—' }}</td>
+        <td class="text-muted" style="font-size:12px">{{ r.notes or '—' }}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state"><div class="ei">💰</div><p>No fee records found.</p></div>
+  {% endif %}
+</div>
+{% endblock %}

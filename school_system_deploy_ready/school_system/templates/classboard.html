@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% block title %}ClassBoard — {{ school_name }}{% endblock %}
+{% block page_title %}ClassBoard{% endblock %}
+{% block content %}
+<div class="top-actions">
+  <div>
+    <h2>ClassBoard</h2>
+    <p class="sub-text">Assignments, announcements & daily assessments for each class.</p>
+  </div>
+  {% if role in ['admin','teacher'] %}
+  <button class="btn btn-primary" onclick="openModal('addDiaryModal')">+ New Entry</button>
+  {% endif %}
+</div>
+
+<div class="card" style="margin-bottom:16px">
+  <form method="GET" style="padding:16px 20px" class="filter-row">
+    {% if role == 'admin' %}
+    <div class="fgroup">
+      <label>Class</label>
+      <select name="class" onchange="this.form.submit()">
+        <option value="">All Classes</option>
+        {% for c in classes %}<option value="{{ c.class }}" {% if cls==c.class %}selected{% endif %}>{{ c.class }}</option>{% endfor %}
+      </select>
+    </div>
+    {% endif %}
+    <div class="fgroup">
+      <label>Type</label>
+      <select name="type" onchange="this.form.submit()">
+        <option value="">All Types</option>
+        {% for t in ['Assignment','Announcement','Assessment','Homework'] %}
+        <option value="{{ t }}" {% if type_filter==t %}selected{% endif %}>{{ t }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% if role == 'teacher' %}<input type="hidden" name="class" value="{{ cls }}">{% endif %}
+  </form>
+</div>
+
+{% if entries %}
+<div class="diary-board">
+  {% for e in entries %}
+  <div class="diary-card dtype-card-{{ e.type.lower() }}">
+    <div class="dc-top">
+      <span class="dtype dtype-{{ e.type.lower() }}">{{ e.type }}</span>
+      <span class="cls-badge">{{ e.class }}</span>
+      {% if role in ['admin','teacher'] %}
+      <form method="POST" action="{{ url_for('delete_diary', eid=e.id) }}" style="margin-left:auto" onsubmit="return confirm('Delete this entry?')">
+        <button type="submit" class="btn btn-xs btn-danger">Delete</button>
+      </form>
+      {% endif %}
+    </div>
+    <h3 class="dc-title">{{ e.title }}</h3>
+    <p class="dc-content">{{ e.content }}</p>
+    <div class="dc-foot">
+      <div class="dc-author">By {{ e.author }}</div>
+      <div class="dc-dates">
+        <span>{{ e.created_at[:10] }}</span>
+        {% if e.due_date %}<span class="dc-due">📅 Due: <strong>{{ e.due_date }}</strong></span>{% endif %}
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card"><div class="empty-state"><div class="ei">📝</div><p>No ClassBoard entries yet.</p></div></div>
+{% endif %}
+
+{% if role in ['admin','teacher'] %}
+<div class="modal-ov" id="addDiaryModal">
+  <div class="modal modal-lg">
+    <div class="modal-hd"><h3>New ClassBoard Entry</h3><button class="modal-x" onclick="closeModal('addDiaryModal')">✕</button></div>
+    <form method="POST" action="{{ url_for('add_diary') }}" style="padding:20px 24px">
+      <div class="form-row-2">
+        <div class="fgroup">
+          <label>Class</label>
+          <select name="class" required>
+            {% for c in classes %}<option value="{{ c.class }}" {% if cls==c.class %}selected{% endif %}>{{ c.class }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="fgroup">
+          <label>Type</label>
+          <select name="type" required>
+            <option value="Assignment">Assignment</option>
+            <option value="Announcement">Announcement</option>
+            <option value="Assessment">Assessment</option>
+            <option value="Homework">Homework</option>
+          </select>
+        </div>
+      </div>
+      <div class="fgroup"><label>Title</label><input type="text" name="title" required placeholder="e.g. Math Homework Chapter 5"></div>
+      <div class="fgroup"><label>Content / Details</label><textarea name="content" required rows="4" placeholder="Describe the assignment or announcement..." style="padding:10px 14px;border:1.5px solid var(--bdr);border-radius:8px;font-family:inherit;font-size:14px;resize:vertical;width:100%"></textarea></div>
+      <div class="fgroup"><label>Due Date <span class="text-muted">(optional)</span></label><input type="date" name="due_date"></div>
+      <div class="modal-foot"><button type="button" class="btn btn-ghost" onclick="closeModal('addDiaryModal')">Cancel</button><button type="submit" class="btn btn-primary">Post to ClassBoard</button></div>
+    </form>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+{% block scripts %}<script>
+// Refresh class dropdowns from API
+(async () => {
+  try {
+    const r = await fetch('/api/classes');
+    const names = await r.json();
+    document.querySelectorAll('select[name="class"], select[name="class_assigned"]').forEach(sel => {
+      const cur = sel.value;
+      const opts = [...sel.options];
+      const firstOpt = opts[0] ? opts[0].outerHTML : '';
+      sel.innerHTML = firstOpt + names.map(n=>`<option value="${n}" ${n===cur?'selected':''}>${n}</option>`).join('');
+    });
+  } catch(e) {}
+})();</script>{% endblock %}

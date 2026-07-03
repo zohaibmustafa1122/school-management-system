@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}My Progress — {{ school_name }}{% endblock %}
+{% block page_title %}My Progress{% endblock %}
+{% block content %}
+<div class="progress-header">
+  <div class="ph-av">{{ student.name[0]|upper }}</div>
+  <div class="ph-info">
+    <h2>{{ student.name }}</h2>
+    <div class="ph-meta">Roll: <code>{{ student.roll_number }}</code> · Class: <span class="cls-badge">{{ student.class }}</span></div>
+  </div>
+  <div class="ph-grade grade-{{ grade.lower() }}">{{ grade }}</div>
+  <a href="{{ url_for('student_report_pdf', sid=student.id) }}" class="btn btn-primary" target="_blank">⬇ Download PDF</a>
+</div>
+
+<div class="stats-row">
+  <div class="scard blue"><div class="scard-icon">📊</div><div class="scard-val">{{ overall_avg }}%</div><div class="scard-lbl">Overall Marks</div></div>
+  <div class="scard {{ 'green' if att_pct>=75 else 'red' }}"><div class="scard-icon">✅</div><div class="scard-val">{{ att_pct }}%</div><div class="scard-lbl">Attendance</div></div>
+  <div class="scard amber"><div class="scard-icon">📅</div><div class="scard-val">{{ present_att }}/{{ total_att }}</div><div class="scard-lbl">Days Present</div></div>
+  <div class="scard purple"><div class="scard-icon">🏆</div><div class="scard-val">Grade {{ grade }}</div><div class="scard-lbl">Final Grade</div></div>
+</div>
+
+<div class="grid-2">
+  <div class="card">
+    <div class="card-hd"><h3>Subject Performance</h3></div>
+    <div class="chart-box"><canvas id="radarChart"></canvas></div>
+  </div>
+  <div class="card">
+    <div class="card-hd"><h3>Monthly Attendance</h3></div>
+    <div class="chart-box"><canvas id="monthChart"></canvas></div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-hd"><h3>Subject Grades</h3></div>
+  <div class="tw">
+    <table class="tbl">
+      <thead><tr><th>Subject</th><th>Average %</th><th>Grade</th></tr></thead>
+      <tbody>
+      {% for s in subj_summary %}
+      {% set pct=s.avg_pct|round(1) %}
+      {% set g='A' if pct>=80 else ('B' if pct>=60 else ('C' if pct>=40 else 'F')) %}
+      <tr>
+        <td><strong>{{ s.subject_name }}</strong></td>
+        <td>
+          <div class="prog-wrap"><div class="prog {{ 'pg-green' if pct>=60 else 'pg-red' }}" style="width:{{ pct }}%"></div></div>
+          {{ pct }}%
+        </td>
+        <td><span class="grade-pill g{{ g }}">{{ g }}</span></td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const sL={{ subj_summary|map(attribute='subject_name')|list|tojson }};
+const sP={{ subj_summary|list|tojson }}.map(s=>Math.round(s.avg_pct*10)/10);
+const mL={{ monthly_att|map(attribute='month')|list|tojson }};
+const mP={{ monthly_att|list|tojson }}.map(m=>Math.round(m.present/m.total*100));
+new Chart(document.getElementById('radarChart'),{type:'radar',data:{labels:sL,datasets:[{label:'%',data:sP,fill:true,backgroundColor:'rgba(59,130,246,0.15)',borderColor:'#3b82f6',pointBackgroundColor:'#3b82f6',pointRadius:4}]},options:{responsive:true,maintainAspectRatio:false,scales:{r:{beginAtZero:true,max:100,ticks:{stepSize:20}}},plugins:{legend:{display:false}}}});
+new Chart(document.getElementById('monthChart'),{type:'bar',data:{labels:mL,datasets:[{label:'Att %',data:mP,backgroundColor:'#10b981',borderRadius:6}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,max:100,ticks:{callback:v=>v+'%'},grid:{color:'#f1f5f9'}},x:{grid:{display:false}}}}});
+</script>
+{% endblock %}

@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+{% block title %}Fees Management — {{ school_name }}{% endblock %}
+{% block page_title %}Fees Management{% endblock %}
+{% block content %}
+
+<div class="stats-row" style="margin-bottom:16px">
+  <div class="scard blue"><div class="scard-icon">💰</div><div class="scard-body"><div class="scard-val">Rs {{ "{:,.0f}".format(total_billed) }}</div><div class="scard-lbl">Total Billed</div></div></div>
+  <div class="scard green"><div class="scard-icon">✅</div><div class="scard-body"><div class="scard-val">Rs {{ "{:,.0f}".format(total_paid) }}</div><div class="scard-lbl">Total Paid</div></div></div>
+  <div class="scard red"><div class="scard-icon">⚠️</div><div class="scard-body"><div class="scard-val">Rs {{ "{:,.0f}".format(total_due) }}</div><div class="scard-lbl">Total Pending</div></div></div>
+  <div class="scard amber"><div class="scard-icon">📋</div><div class="scard-body"><div class="scard-val">{{ records|length }}</div><div class="scard-lbl">Records Shown</div></div></div>
+</div>
+
+{# Filters #}
+<div class="card" style="margin-bottom:16px">
+  <div class="card-hd"><h3>Filter Records</h3></div>
+  <form method="GET" style="padding:14px 20px" class="filter-row">
+    <div class="fgroup">
+      <label>Class</label>
+      <select name="class" onchange="this.form.submit()">
+        <option value="">All Classes</option>
+        {% for c in classes %}<option value="{{ c.class }}" {% if cls_filter==c.class %}selected{% endif %}>{{ c.class }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="fgroup">
+      <label>Month</label>
+      <select name="month" onchange="this.form.submit()">
+        <option value="">All Months</option>
+        {% for m in months %}<option value="{{ m.month }}" {% if month_filter==m.month %}selected{% endif %}>{{ m.month }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="fgroup">
+      <label>Search Student</label>
+      <input type="text" name="q" value="{{ search }}" placeholder="Name or roll…">
+    </div>
+    <div class="fgroup" style="justify-content:flex-end">
+      <label>&nbsp;</label>
+      <div style="display:flex;gap:8px">
+        <button type="submit" class="btn btn-outline">Filter</button>
+        <a href="{{ url_for('fees') }}" class="btn btn-ghost">Clear</a>
+        <a href="{{ url_for('fees_pdf', **{'class':cls_filter,'month':month_filter}) }}" target="_blank" class="btn btn-outline">🖨 PDF</a>
+        <button type="button" class="btn btn-primary" onclick="openModal('addFeeModal')">+ Add Entry</button>
+      </div>
+    </div>
+  </form>
+</div>
+
+{# Records table #}
+<div class="card">
+  <div class="card-hd">
+    <h3>Fee Records <span class="badge bb" id="selCount">{{ records|length }}</span></h3>
+    <div class="btn-group">
+      <button class="btn btn-sm btn-outline" onclick="selectAll()">☑ Select All</button>
+      <form method="POST" action="{{ url_for('delete_fees') }}" id="bulkDelForm" onsubmit="return confirmBulkDel()">
+        <div id="delIds"></div>
+        <button type="submit" class="btn btn-sm btn-danger" id="bulkDelBtn" disabled>Delete Selected</button>
+      </form>
+    </div>
+  </div>
+  {% if records %}
+  <div class="tw">
+    <table class="tbl">
+      <thead>
+        <tr>
+          <th style="width:40px"><input type="checkbox" id="masterChk" onchange="toggleAll(this)" style="width:16px;height:16px;cursor:pointer"></th>
+          <th>Student</th><th>Roll</th><th>Class</th><th>Month</th>
+          <th>Total (Rs)</th><th>Paid (Rs)</th><th>Due (Rs)</th><th>Status</th><th>Due Date</th><th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for r in records %}
+      {% if r.id %}
+      <tr id="frow-{{ r.id }}" class="{% if r.status=='Pending' %}row-warn{% endif %}">
+        <td><input type="checkbox" class="row-check" value="{{ r.id }}" onchange="updateSel()" style="width:16px;height:16px;cursor:pointer"></td>
+        <td><strong>{{ r.name }}</strong>{% if r.parent_phone %}<br><span class="text-muted" style="font-size:11px">📞 {{ r.parent_phone }}</span>{% endif %}</td>
+        <td><code>{{ r.roll_number }}</code></td>
+        <td><span class="cls-badge">{{ r.class }}</span></td>
+        <td><strong>{{ r.month }}</strong></td>
+        <td>{{ "{:,.0f}".format(r.total_amount) }}</td>
+        <td class="text-green"><strong>{{ "{:,.0f}".format(r.paid_amount) }}</strong></td>
+        <td class="{{ 'text-red' if r.due_amount > 0 else '' }}"><strong>{{ "{:,.0f}".format(r.due_amount) }}</strong></td>
+        <td>
+          {% if r.status=='Paid' %}<span class="badge bg">Paid</span>
+          {% elif r.status=='Partial' %}<span class="badge bo">Partial</span>
+          {% else %}<span class="badge br">Pending</span>{% endif %}
+        </td>
+        <td>{{ r.due_date or '—' }}</td>
+        <td>
+          <button class="btn btn-xs btn-outline" onclick="openEditFee({{ r.id }},{{ r.total_amount }},{{ r.paid_amount }},'{{ r.due_date or '' }}','{{ r.notes or '' }}')">Edit</button>
+          <form method="POST" action="{{ url_for('delete_fees') }}" style="display:inline"
+                onsubmit="return confirm('Delete this fee record?')">
+            <input type="hidden" name="selected_ids" value="{{ r.id }}">
+            <button type="submit" class="btn btn-xs btn-danger">Del</button>
+          </form>
+        </td>
+      </tr>
+      {% endif %}
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state"><div class="ei">💰</div><p>No fee records found.</p></div>
+  {% endif %}
+</div>
+
+{# Add Fee Modal #}
+<div class="modal-ov" id="addFeeModal">
+  <div class="modal modal-lg">
+    <div class="modal-hd"><h3>Add Fee Entry</h3><button class="modal-x" onclick="closeModal('addFeeModal')">✕</button></div>
+    <form method="POST" action="{{ url_for('add_fee') }}" style="padding:20px 24px">
+      <div class="form-row-2">
+        <div class="fgroup">
+          <label>Student</label>
+          <select name="student_id" required id="addFeeStudent">
+            <option value="">— Select Student —</option>
+            {% for s in students %}<option value="{{ s.id }}">{{ s.name }} ({{ s.class }}, Roll {{ s.roll_number }})</option>{% endfor %}
+          </select>
+        </div>
+        <div class="fgroup">
+          <label>Month</label>
+          <input type="month" name="month" required value="{{ now.strftime('%Y-%m') }}">
+        </div>
+      </div>
+      <div class="form-row-2">
+        <div class="fgroup">
+          <label>Total Fee Amount (Rs)</label>
+          <input type="number" name="total_amount" required min="0" step="0.01" placeholder="e.g. 2500">
+        </div>
+        <div class="fgroup">
+          <label>Amount Paid (Rs)</label>
+          <input type="number" name="paid_amount" value="0" min="0" step="0.01">
+        </div>
+      </div>
+      <div class="form-row-2">
+        <div class="fgroup">
+          <label>Due Date <span class="text-muted">(optional)</span></label>
+          <input type="date" name="due_date">
+        </div>
+        <div class="fgroup">
+          <label>Notes <span class="text-muted">(optional)</span></label>
+          <input type="text" name="notes" placeholder="e.g. Scholarship discount">
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('addFeeModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Add Fee Entry</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{# Edit Fee Modal #}
+<div class="modal-ov" id="editFeeModal">
+  <div class="modal">
+    <div class="modal-hd"><h3>Edit Fee Record</h3><button class="modal-x" onclick="closeModal('editFeeModal')">✕</button></div>
+    <form method="POST" id="editFeeForm" style="padding:20px 24px">
+      <div class="fgroup"><label>Total Fee Amount (Rs)</label><input type="number" name="total_amount" id="ef_total" required min="0" step="0.01"></div>
+      <div class="fgroup"><label>Amount Paid (Rs)</label><input type="number" name="paid_amount" id="ef_paid" required min="0" step="0.01"></div>
+      <div class="fgroup"><label>Due Date</label><input type="date" name="due_date" id="ef_due"></div>
+      <div class="fgroup"><label>Notes</label><input type="text" name="notes" id="ef_notes" placeholder="Optional notes"></div>
+      <div class="modal-foot">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('editFeeModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Changes</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let selectedIds = new Set();
+function toggleAll(m){ document.querySelectorAll('.row-check').forEach(c=>{c.checked=m.checked;m.checked?selectedIds.add(c.value):selectedIds.delete(c.value);hi(c.value,c.checked);}); updateUI(); }
+function selectAll(){ const cbs=document.querySelectorAll('.row-check'),all=[...cbs].every(c=>c.checked); cbs.forEach(c=>{c.checked=!all;!all?selectedIds.add(c.value):selectedIds.delete(c.value);hi(c.value,!all);}); document.getElementById('masterChk').checked=!all; updateUI(); }
+function updateSel(){ selectedIds.clear(); document.querySelectorAll('.row-check').forEach(c=>{if(c.checked)selectedIds.add(c.value);hi(c.value,c.checked);}); document.getElementById('masterChk').checked=selectedIds.size===document.querySelectorAll('.row-check').length&&selectedIds.size>0; updateUI(); }
+function hi(id,on){ const r=document.getElementById('frow-'+id); if(r)r.style.background=on?'#eff6ff':''; }
+function updateUI(){ const n=selectedIds.size,btn=document.getElementById('bulkDelBtn'); btn.disabled=n===0; btn.textContent=n>0?'Delete Selected ('+n+')':'Delete Selected'; document.getElementById('selCount').textContent=n>0?n+' selected':'{{ records|length }}'; }
+function confirmBulkDel(){ if(!selectedIds.size)return false; if(!confirm('Delete '+selectedIds.size+' records?'))return false; const c=document.getElementById('delIds'); c.innerHTML=''; selectedIds.forEach(id=>{const i=document.createElement('input');i.type='hidden';i.name='selected_ids';i.value=id;c.appendChild(i);}); return true; }
+function openEditFee(id,total,paid,due,notes){
+  document.getElementById('editFeeForm').action='/fees/edit/'+id;
+  document.getElementById('ef_total').value=total;
+  document.getElementById('ef_paid').value=paid;
+  document.getElementById('ef_due').value=due;
+  document.getElementById('ef_notes').value=notes;
+  openModal('editFeeModal');
+}
+</script>
+{% endblock %}

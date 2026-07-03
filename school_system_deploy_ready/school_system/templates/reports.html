@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}Reports — {{ school_name }}{% endblock %}
+{% block page_title %}Reports{% endblock %}
+{% block content %}
+<div class="card">
+  <div class="card-hd"><h3>Generate Report</h3></div>
+  <form method="GET" style="padding:20px" class="filter-row">
+    {% if session.role=='admin' %}
+    <div class="fgroup">
+      <label>Class</label>
+      <select name="class" onchange="this.form.submit()">
+        <option value="">— Class —</option>
+        {% for c in classes %}<option value="{{ c.class }}" {% if sel_class==c.class %}selected{% endif %}>{{ c.class }}</option>{% endfor %}
+      </select>
+    </div>
+    {% else %}
+    <input type="hidden" name="class" value="{{ sel_class }}">
+    {% endif %}
+    <div class="fgroup"><label>Date From</label><input type="date" name="date_from" value="{{ date_from }}"></div>
+    <div class="fgroup"><label>Date To</label><input type="date" name="date_to" value="{{ date_to }}"></div>
+    <div class="fgroup" style="justify-content:flex-end">
+      <label>&nbsp;</label>
+      <div style="display:flex;gap:8px">
+        <button type="submit" class="btn btn-primary">Generate</button>
+        {% if results %}<a href="{{ url_for('attendance_report_pdf', **{'class':sel_class,'date_from':date_from,'date_to':date_to}) }}" class="btn btn-outline" target="_blank">🖨 PDF Report</a>
+      <a href="{{ url_for('export_report', **{'class':sel_class,'date_from':date_from,'date_to':date_to}) }}" class="btn btn-outline">⬇ CSV</a>{% endif %}
+      </div>
+    </div>
+  </form>
+</div>
+
+{% if results %}
+<div class="card">
+  <div class="card-hd">
+    <h3>Class {{ sel_class }} Report <span class="badge bb">{{ results|length }} students</span></h3>
+    {% if date_from or date_to %}<div class="sub-text">{{ date_from or '—' }} to {{ date_to or '—' }}</div>{% endif %}
+  </div>
+  <div class="tw">
+    <table class="tbl">
+      <thead><tr><th>Name</th><th>Roll</th><th>Days</th><th>Present</th><th>Attendance %</th><th>Avg Marks %</th><th>Grade</th><th>Status</th><th>Report</th></tr></thead>
+      <tbody>
+      {% for r in results %}
+      <tr class="{% if r.att_pct<75 or r.avg_marks<40 %}row-warn{% endif %}">
+        <td><strong>{{ r.name }}</strong></td>
+        <td><code>{{ r.roll }}</code></td>
+        <td>{{ r.total_att }}</td>
+        <td>{{ r.present }}</td>
+        <td>
+          <div class="prog-wrap"><div class="prog {{ 'pg-green' if r.att_pct>=75 else 'pg-red' }}" style="width:{{ r.att_pct }}%"></div></div>
+          <span class="{{ 'text-red' if r.att_pct<75 else '' }}">{{ r.att_pct }}%</span>
+        </td>
+        <td>
+          <div class="prog-wrap"><div class="prog {{ 'pg-green' if r.avg_marks>=60 else 'pg-red' }}" style="width:{{ r.avg_marks }}%"></div></div>
+          {{ r.avg_marks }}%
+        </td>
+        <td><span class="grade-pill g{{ r.grade }}">{{ r.grade }}</span></td>
+        <td>
+          {% if r.att_pct < 75 %}<span class="badge br">Low Att.</span>{% endif %}
+          {% if r.avg_marks < 40 %}<span class="badge br">Failing</span>{% endif %}
+          {% if r.att_pct >= 75 and r.avg_marks >= 60 %}<span class="badge bg">Good</span>{% endif %}
+        </td>
+        <td><a href="{{ url_for('student_report_pdf', sid=r.id) }}" class="btn btn-xs btn-outline" target="_blank">PDF</a></td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% elif sel_class %}
+<div class="card"><div class="empty-state"><div class="ei">📋</div><p>No data found for this selection.</p></div></div>
+{% else %}
+<div class="card"><div class="empty-state"><div class="ei">📋</div><p>Select a class to generate a report.</p></div></div>
+{% endif %}
+{% endblock %}
+{% block scripts %}<script>
+// Refresh class dropdowns from API
+(async () => {
+  try {
+    const r = await fetch('/api/classes');
+    const names = await r.json();
+    document.querySelectorAll('select[name="class"], select[name="class_assigned"]').forEach(sel => {
+      const cur = sel.value;
+      const opts = [...sel.options];
+      const firstOpt = opts[0] ? opts[0].outerHTML : '';
+      sel.innerHTML = firstOpt + names.map(n=>`<option value="${n}" ${n===cur?'selected':''}>${n}</option>`).join('');
+    });
+  } catch(e) {}
+})();</script>{% endblock %}

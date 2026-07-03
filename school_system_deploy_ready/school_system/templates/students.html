@@ -1,0 +1,254 @@
+{% extends "base.html" %}
+{% block title %}Students — {{ school_name }}{% endblock %}
+{% block page_title %}Students{% endblock %}
+{% block content %}
+<div class="top-actions">
+  <form method="GET" class="search-bar" id="filterForm">
+    {% if session.role == 'admin' %}
+    <select name="class" onchange="this.form.submit()">
+      <option value="">All Classes</option>
+      {% for c in classes %}<option value="{{ c.class }}" {% if cls_filter==c.class %}selected{% endif %}>{{ c.class }}</option>{% endfor %}
+    </select>
+    {% endif %}
+    <input type="text" name="q" placeholder="🔍 Search name or roll…" value="{{ search }}">
+    <button type="submit" class="btn btn-outline">Search</button>
+    {% if search or cls_filter %}<a href="{{ url_for('students') }}" class="btn btn-ghost">Clear</a>{% endif %}
+  </form>
+  <div class="btn-group">
+    <button class="btn btn-outline btn-sm" onclick="selectAll()">☑ Select All</button>
+    <button type="button" class="btn btn-danger btn-sm" id="bulkDelBtn" disabled onclick="bulkDeleteStudents()">Delete Selected</button>
+    <button class="btn btn-primary" onclick="openModal('addStudentModal')">+ Add Student</button>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-hd">
+    <h3>Students <span class="badge bb" id="selCount">{{ students|length }} total</span></h3>
+  </div>
+  {% if students %}
+  <div class="tw">
+    <table class="tbl">
+      <thead>
+        <tr>
+          <th style="width:44px"><input type="checkbox" id="masterCheck" onchange="toggleAll(this)" style="width:16px;height:16px;cursor:pointer"></th>
+          <th>#</th><th>Name</th><th>Roll No.</th><th>Class</th><th>Parent Phone</th><th>Login</th><th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for s in students %}
+      <tr id="srow-{{ s.id }}">
+        <td><input type="checkbox" class="row-check" value="{{ s.id }}" onchange="updateSelection()" style="width:16px;height:16px;cursor:pointer"></td>
+        <td class="text-muted">{{ loop.index }}</td>
+        <td><strong>{{ s.name }}</strong></td>
+        <td><code>{{ s.roll_number }}</code></td>
+        <td><span class="cls-badge">{{ s.class }}</span></td>
+        <td><span class="text-muted" style="font-size:12px">{{ s.parent_phone or '—' }}</span></td>
+        <td><code class="text-muted" style="font-size:11px">student_{{ s.roll_number }}</code></td>
+        <td>
+          <a href="{{ url_for('progress', student_id=s.id, **{'class':s.class}) }}" class="btn btn-xs btn-outline">Progress</a>
+          <a href="{{ url_for('student_report_pdf', sid=s.id) }}" class="btn btn-xs btn-outline" target="_blank">PDF</a>
+          <button class="btn btn-xs btn-outline"
+            onclick="openEditStudent(
+              {{ s.id }},
+              {{ s.name | tojson }},
+              {{ s.roll_number | tojson }},
+              {{ s.class | tojson }},
+              {{ (s.parent_phone or '') | tojson }}
+            )">Edit</button>
+          <form method="POST" action="{{ url_for('delete_student', sid=s.id) }}" style="display:inline"
+                onsubmit="return confirm('Delete {{ s.name }}? All their marks and attendance will also be deleted.')">
+            <button type="submit" class="btn btn-xs btn-danger">Del</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state"><div class="ei">👥</div><p>No students found{% if search %} matching "<strong>{{ search }}</strong>"{% endif %}.</p></div>
+  {% endif %}
+</div>
+
+<!-- Add Modal -->
+<div class="modal-ov" id="addStudentModal">
+  <div class="modal">
+    <div class="modal-hd"><h3>Add Student</h3><button class="modal-x" onclick="closeModal('addStudentModal')">✕</button></div>
+    <form method="POST" action="{{ url_for('add_student') }}" style="padding:20px 24px">
+      <div class="fgroup"><label>Full Name</label><input type="text" name="name" required placeholder="e.g. Ahmed Khan"></div>
+      <div class="fgroup"><label>Roll Number</label><input type="text" name="roll_number" required placeholder="e.g. 015"></div>
+      <div class="fgroup">
+        <label>Class</label>
+        {% if session.role == 'teacher' %}
+        <input type="text" name="class" value="{{ session.class_assigned }}" readonly style="background:#f8fafc">
+        {% else %}
+        <select name="class" id="addStudentClass" required>
+          <option value="">— Select Class —</option>
+          {% for c in classes %}<option value="{{ c.class }}">{{ c.class }}</option>{% endfor %}
+        </select>
+        {% endif %}
+      </div>
+      <div class="fgroup">
+        <label>Parent / Guardian Phone <span class="text-muted">(optional)</span></label>
+        <input type="text" name="parent_phone" placeholder="e.g. 03001234567">
+      </div>
+      <div class="fgroup"><small class="text-muted">Student login auto-created: <code>student_[roll]</code> / <code>student123</code></small></div>
+      <div class="modal-foot">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('addStudentModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Add Student</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Edit Modal -->
+<div class="modal-ov" id="editStudentModal">
+  <div class="modal">
+    <div class="modal-hd"><h3>Edit Student</h3><button class="modal-x" onclick="closeModal('editStudentModal')">✕</button></div>
+    <form method="POST" id="editStudentForm" style="padding:20px 24px">
+      <div class="fgroup">
+        <label>Full Name</label>
+        <input type="text" name="name" id="esName" required>
+      </div>
+      <div class="fgroup">
+        <label>Roll Number</label>
+        <input type="text" name="roll_number" id="esRoll" required>
+      </div>
+      <div class="fgroup">
+        <label>Class</label>
+        <select name="class" id="esClass" required>
+          {% for c in classes %}
+          <option value="{{ c.class }}">{{ c.class }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="fgroup">
+        <label>Parent / Guardian Phone <span class="text-muted">(optional)</span></label>
+        <input type="text" name="parent_phone" id="esPhone" placeholder="e.g. 03001234567">
+      </div>
+      <div class="modal-foot">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('editStudentModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Changes</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="bulkForms"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let selectedIds = new Set();
+let pendingEditClass = null;  // holds class value while dropdown loads
+
+/* ── CHECKBOX SELECTION ─────────────────────────────────── */
+function toggleAll(master) {
+  document.querySelectorAll('.row-check').forEach(cb => {
+    cb.checked = master.checked;
+    master.checked ? selectedIds.add(cb.value) : selectedIds.delete(cb.value);
+    highlightRow(cb.value, cb.checked);
+  });
+  updateSelectionUI();
+}
+function selectAll() {
+  const cbs = document.querySelectorAll('.row-check');
+  const allChecked = [...cbs].every(cb => cb.checked);
+  cbs.forEach(cb => {
+    cb.checked = !allChecked;
+    !allChecked ? selectedIds.add(cb.value) : selectedIds.delete(cb.value);
+    highlightRow(cb.value, !allChecked);
+  });
+  document.getElementById('masterCheck').checked = !allChecked;
+  updateSelectionUI();
+}
+function updateSelection() {
+  selectedIds.clear();
+  document.querySelectorAll('.row-check').forEach(cb => {
+    if (cb.checked) selectedIds.add(cb.value);
+    highlightRow(cb.value, cb.checked);
+  });
+  const all = document.querySelectorAll('.row-check').length;
+  document.getElementById('masterCheck').checked = selectedIds.size === all && all > 0;
+  updateSelectionUI();
+}
+function highlightRow(id, on) {
+  const row = document.getElementById('srow-' + id);
+  if (row) row.style.background = on ? '#eff6ff' : '';
+}
+function updateSelectionUI() {
+  const n = selectedIds.size;
+  const btn = document.getElementById('bulkDelBtn');
+  btn.disabled = n === 0;
+  btn.textContent = n > 0 ? 'Delete Selected (' + n + ')' : 'Delete Selected';
+  document.getElementById('selCount').textContent = n > 0 ? n + ' selected' : '{{ students|length }} total';
+}
+function bulkDeleteStudents() {
+  if (!selectedIds.size) return;
+  if (!confirm('Delete ' + selectedIds.size + ' student(s)? All marks and attendance will also be deleted.')) return;
+  // Delete one by one sequentially
+  const ids = [...selectedIds];
+  ids.forEach(id => {
+    const f = document.createElement('form');
+    f.method = 'POST';
+    f.action = '/students/delete/' + id;
+    document.getElementById('bulkForms').appendChild(f);
+  });
+  document.querySelectorAll('#bulkForms form')[0]?.submit();
+}
+
+/* ── EDIT STUDENT ───────────────────────────────────────── */
+function openEditStudent(id, name, roll, cls, phone) {
+  document.getElementById('editStudentForm').action = '/students/edit/' + id;
+  document.getElementById('esName').value  = name;
+  document.getElementById('esRoll').value  = roll;
+  document.getElementById('esPhone').value = phone || '';
+
+  // Set class immediately on the existing options
+  const clsSel = document.getElementById('esClass');
+  // Try to set right away
+  clsSel.value = cls;
+  // If the option doesn't exist yet (API not loaded), store it for later
+  if (clsSel.value !== cls) {
+    pendingEditClass = cls;
+  } else {
+    pendingEditClass = null;
+  }
+
+  openModal('editStudentModal');
+}
+
+/* ── LOAD CLASSES FROM API (keeps dropdowns in sync) ─────── */
+async function loadClassDropdowns() {
+  try {
+    const r = await fetch('/api/classes');
+    const names = await r.json();
+
+    // Update add modal dropdown
+    const addSel = document.getElementById('addStudentClass');
+    if (addSel) {
+      const cur = addSel.value;
+      addSel.innerHTML = '<option value="">— Select Class —</option>' +
+        names.map(n => `<option value="${n}" ${n===cur?'selected':''}>${n}</option>`).join('');
+    }
+
+    // Update edit modal dropdown
+    const editSel = document.getElementById('esClass');
+    if (editSel) {
+      const cur = editSel.value || pendingEditClass;
+      editSel.innerHTML = names.map(n => `<option value="${n}" ${n===cur?'selected':''}>${n}</option>`).join('');
+      // Apply pending class selection if we had one
+      if (pendingEditClass) {
+        editSel.value = pendingEditClass;
+        pendingEditClass = null;
+      }
+    }
+  } catch(e) {
+    console.warn('Could not load classes from API:', e);
+  }
+}
+
+// Load on page ready
+loadClassDropdowns();
+</script>
+{% endblock %}

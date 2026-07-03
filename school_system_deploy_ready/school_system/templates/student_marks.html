@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}My Marks — {{ school_name }}{% endblock %}
+{% block page_title %}My Marks{% endblock %}
+{% block content %}
+
+{# Summary chart #}
+<div class="card" style="margin-bottom:18px">
+  <div class="card-hd"><h3>Overall Subject Performance</h3></div>
+  <div class="chart-box"><canvas id="marksChart"></canvas></div>
+</div>
+
+{# Subject cards — click to expand #}
+{% if subj_summary %}
+<div class="subj-grid" style="margin-bottom:18px">
+  {% for sub in subj_summary %}
+  {% set pct = sub.avg_pct|round(1) %}
+  {% set g = 'A' if pct>=80 else ('B' if pct>=60 else ('C' if pct>=40 else 'F')) %}
+  <div class="subj-card student-subj-card" onclick="toggleSubjectPanel('sp-{{ loop.index }}')" id="ssc-{{ loop.index }}">
+    <div class="sc-icon">📚</div>
+    <div class="sc-name">{{ sub.subject_name }}</div>
+    <div style="margin-top:6px">
+      <span class="grade-pill g{{ g }}" style="font-size:13px">{{ g }}</span>
+      <span style="font-size:12px;color:var(--muted);margin-left:6px">{{ pct }}%</span>
+    </div>
+    <div style="font-size:11px;color:var(--muted);margin-top:4px">{{ sub.count }} exam{{ 's' if sub.count != 1 else '' }}</div>
+    <div class="sc-expand-hint" id="hint-{{ loop.index }}">▼ View Details</div>
+  </div>
+  {% endfor %}
+</div>
+
+{# Expandable panels per subject #}
+{% for sub in subj_summary %}
+<div class="subject-panel" id="sp-{{ loop.index }}" style="display:none;margin-bottom:16px">
+  <div class="card">
+    <div class="card-hd" style="background:var(--primary)">
+      <h3 style="color:#fff">{{ sub.subject_name }}</h3>
+      <div style="display:flex;align-items:center;gap:10px">
+        {% set pct = sub.avg_pct|round(1) %}
+        {% set g = 'A' if pct>=80 else ('B' if pct>=60 else ('C' if pct>=40 else 'F')) %}
+        <span style="color:rgba(255,255,255,.8);font-size:13px">Average: {{ pct }}%</span>
+        <span class="grade-pill g{{ g }}">{{ g }}</span>
+        <button onclick="toggleSubjectPanel('sp-{{ loop.index }}')" style="background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px">✕ Close</button>
+      </div>
+    </div>
+    <div class="tw">
+      <table class="tbl">
+        <thead><tr><th>Exam Type</th><th>Marks</th><th>Total</th><th>%</th><th>Grade</th></tr></thead>
+        <tbody>
+        {% set ns = namespace(found=false) %}
+        {% for m in marks %}
+        {% if m.subject_name == sub.subject_name %}
+        {% set ns.found = true %}
+        {% set g2 = 'A' if m.pct>=80 else ('B' if m.pct>=60 else ('C' if m.pct>=40 else 'F')) %}
+        <tr class="{% if m.pct < 40 %}row-warn{% endif %}">
+          <td><span class="etype">{{ m.exam_type }}</span></td>
+          <td><strong>{{ m.marks_obtained }}</strong></td>
+          <td>{{ m.total_marks }}</td>
+          <td>
+            <div class="prog-wrap"><div class="prog {{ 'pg-green' if m.pct>=60 else 'pg-red' }}" style="width:{{ m.pct }}%"></div></div>
+            {{ m.pct }}%
+          </td>
+          <td><span class="grade-pill g{{ g2 }}">{{ g2 }}</span></td>
+        </tr>
+        {% endif %}
+        {% endfor %}
+        {% if not ns.found %}
+        <tr><td colspan="5" class="text-muted" style="text-align:center;padding:16px">No marks recorded yet</td></tr>
+        {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endfor %}
+
+{% else %}
+<div class="card"><div class="empty-state"><div class="ei">📊</div><p>No marks recorded for you yet.</p></div></div>
+{% endif %}
+
+{% endblock %}
+{% block scripts %}
+<script>
+function toggleSubjectPanel(id) {
+  const panel = document.getElementById(id);
+  const idx = id.replace('sp-','');
+  const card = document.getElementById('ssc-' + idx);
+  const hint = document.getElementById('hint-' + idx);
+  const isOpen = panel.style.display !== 'none';
+  panel.style.display = isOpen ? 'none' : 'block';
+  if (card) { card.classList.toggle('subj-active', !isOpen); }
+  if (hint) hint.textContent = isOpen ? '▼ View Details' : '▲ Hide Details';
+  if (!isOpen) panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+const sL = {{ subj_summary|map(attribute='subject_name')|list|tojson }};
+const sD = {{ subj_summary|list|tojson }}.map(s => Math.round(s.avg_pct * 10) / 10);
+const colors = sD.map(p => p>=80?'#10b981':p>=60?'#3b82f6':p>=40?'#f59e0b':'#ef4444');
+new Chart(document.getElementById('marksChart'), {
+  type: 'bar',
+  data: { labels: sL, datasets: [{ label: 'Avg %', data: sD, backgroundColor: colors, borderRadius: 8 }] },
+  options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+    scales: { y: { beginAtZero: true, max: 100, ticks: { callback: v => v + '%' }, grid: { color: '#f1f5f9' } }, x: { grid: { display: false } } } }
+});
+</script>
+{% endblock %}

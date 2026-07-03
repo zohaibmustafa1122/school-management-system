@@ -1,0 +1,277 @@
+{% extends "base.html" %}
+{% block title %}User Accounts — {{ school_name }}{% endblock %}
+{% block page_title %}User Accounts{% endblock %}
+{% block content %}
+<div class="top-actions">
+  <div class="ta-left">
+    <h2>Manage Logins &amp; Permissions</h2>
+    <p class="sub-text">View, create, edit, and manage all user credentials. Passwords are stored and visible to admin.</p>
+  </div>
+  <div class="btn-group">
+    <button class="btn btn-outline btn-sm" onclick="selectAll()">☑ Select All</button>
+    <button type="button" class="btn btn-danger btn-sm" id="bulkDelBtn" disabled onclick="bulkDeleteUsers()">Delete Selected</button>
+    <button class="btn btn-primary" onclick="openModal('addUserModal')">+ New User</button>
+  </div>
+</div>
+<div id="bulkForms"></div>
+
+{% for role_name in ['admin','teacher','student'] %}
+{% set role_users = users|selectattr('role','equalto',role_name)|list %}
+{% if role_users %}
+<div class="card" style="margin-bottom:20px">
+  <div class="card-hd">
+    <h3>{{ role_name|title }}s <span class="badge bb">{{ role_users|length }}</span></h3>
+    <span class="text-muted" style="font-size:12px">🔑 Click <strong>Show</strong> to reveal password · <strong>⎘</strong> to copy</span>
+  </div>
+  <div class="tw">
+    <table class="tbl">
+      <thead>
+        <tr>
+          <th style="width:40px"><input type="checkbox" onchange="toggleRoleGroup(this)" style="width:16px;height:16px;cursor:pointer"></th>
+          <th>Full Name</th>
+          <th>Username</th>
+          <th>Password</th>
+          <th>Role</th>
+          <th>Class / Student</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for u in role_users %}
+      <tr id="urow-{{ u.id }}">
+        <td><input type="checkbox" class="row-check" value="{{ u.id }}" onchange="updateSelection()" style="width:16px;height:16px;cursor:pointer" {% if u.id == session.user_id %}disabled title="Your own account"{% endif %}></td>
+        <td><strong>{{ u.full_name or '—' }}</strong></td>
+        <td>
+          <div style="display:flex;align-items:center;gap:5px">
+            <code>{{ u.username }}</code>
+            <button type="button" class="copy-btn" onclick="copyText('{{ u.username }}', this)" title="Copy username">⎘</button>
+          </div>
+        </td>
+        <td>
+          <div style="display:flex;align-items:center;gap:5px">
+            <span class="pw-dots" id="pwdots-{{ u.id }}">••••••••</span>
+            <code id="pwval-{{ u.id }}" style="display:none;font-size:12px;background:#fef9c3;padding:2px 7px;border-radius:4px;color:#854d0e">
+              {{ u.plain_password if u.plain_password else '(use Reset PW)' }}
+            </code>
+            <button type="button" class="copy-btn" onclick="togglePw({{ u.id }})" id="pwbtn-{{ u.id }}">Show</button>
+            {% if u.plain_password %}
+            <button type="button" class="copy-btn" onclick="copyText('{{ u.plain_password }}', this)" title="Copy password">⎘</button>
+            {% endif %}
+          </div>
+        </td>
+        <td><span class="role-pill role-{{ u.role }}">{{ u.role|title }}</span></td>
+        <td>
+          {% if u.class_assigned %}<span class="cls-badge">{{ u.class_assigned }}</span>
+          {% elif u.sname %}<span class="text-muted" style="font-size:12px">{{ u.sname }} ({{ u.sclass }})</span>
+          {% else %}<span class="text-muted">—</span>{% endif %}
+        </td>
+        <td>
+          <button class="btn btn-xs btn-outline" onclick="openEditUser({{ u.id }},'{{ u.full_name|replace("'","\\'") if u.full_name else '' }}','{{ u.class_assigned or '' }}')">Edit</button>
+          <button class="btn btn-xs btn-outline" onclick="openResetPw({{ u.id }}, '{{ u.username }}')">Reset PW</button>
+          {% if u.id != session.user_id %}
+          <form method="POST" action="{{ url_for('delete_user', uid=u.id) }}" style="display:inline"
+                onsubmit="return confirm('Delete user {{ u.username }}? This cannot be undone.')">
+            <button type="submit" class="btn btn-xs btn-danger">Del</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+{% endfor %}
+
+<!-- Add User Modal -->
+<div class="modal-ov" id="addUserModal">
+  <div class="modal">
+    <div class="modal-hd"><h3>Create User Account</h3><button class="modal-x" onclick="closeModal('addUserModal')">✕</button></div>
+    <form method="POST" action="{{ url_for('add_user') }}" style="padding:20px 24px">
+      <div class="fgroup"><label>Full Name</label><input type="text" name="full_name" placeholder="e.g. Mrs. Ayesha Khan" required></div>
+      <div class="fgroup"><label>Username</label><input type="text" name="username" placeholder="e.g. teacher4" required></div>
+      <div class="fgroup">
+        <label>Password</label>
+        <div style="display:flex;gap:8px">
+          <input type="text" name="password" id="newPwField" placeholder="Set a password" required style="flex:1">
+          <button type="button" onclick="genPassword()" class="btn btn-outline btn-sm">Generate</button>
+        </div>
+      </div>
+      <div class="fgroup">
+        <label>Role</label>
+        <select name="role" id="addRoleSelect" onchange="toggleClassField(this.value)">
+          <option value="teacher">Teacher</option>
+          <option value="admin">Admin</option>
+          <option value="student">Student</option>
+        </select>
+      </div>
+      <div class="fgroup" id="addClassField">
+        <label>Class Assigned <span class="text-muted">(for teachers)</span></label>
+        <select name="class_assigned" id="addUserClass">
+          <option value="">— None —</option>
+          {% for c in classes %}<option value="{{ c.class }}">{{ c.class }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="modal-foot">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('addUserModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Create Account</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Edit User Modal -->
+<div class="modal-ov" id="editUserModal">
+  <div class="modal">
+    <div class="modal-hd"><h3>Edit User</h3><button class="modal-x" onclick="closeModal('editUserModal')">✕</button></div>
+    <form method="POST" id="editUserForm" style="padding:20px 24px">
+      <div class="fgroup"><label>Full Name</label><input type="text" name="full_name" id="euName" required></div>
+      <div class="fgroup">
+        <label>Class Assigned</label>
+        <select name="class_assigned" id="euClass">
+          <option value="">— None —</option>
+          {% for c in classes %}<option value="{{ c.class }}">{{ c.class }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="fgroup">
+        <label>New Password <span class="text-muted">(leave blank to keep current)</span></label>
+        <input type="text" name="new_password" placeholder="Enter new password…">
+      </div>
+      <div class="modal-foot">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('editUserModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Changes</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Reset Password Modal -->
+<div class="modal-ov" id="resetPwModal">
+  <div class="modal">
+    <div class="modal-hd"><h3>Reset Password</h3><button class="modal-x" onclick="closeModal('resetPwModal')">✕</button></div>
+    <form method="POST" id="resetPwForm" style="padding:20px 24px">
+      <p style="font-size:13px;color:var(--muted);margin-bottom:16px">Setting new password for: <strong id="resetPwUsername"></strong></p>
+      <div class="fgroup">
+        <label>New Password</label>
+        <div style="display:flex;gap:8px">
+          <input type="text" name="new_password" id="resetPwInput" placeholder="Enter new password" required style="flex:1">
+          <button type="button" onclick="genPasswordReset()" class="btn btn-outline btn-sm">Generate</button>
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('resetPwModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Reset Password</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let selectedIds = new Set();
+
+function togglePw(id) {
+  const dots = document.getElementById('pwdots-' + id);
+  const val  = document.getElementById('pwval-'  + id);
+  const btn  = document.getElementById('pwbtn-'  + id);
+  const showing = val.style.display !== 'none';
+  dots.style.display = showing ? '' : 'none';
+  val.style.display  = showing ? 'none' : '';
+  btn.textContent    = showing ? 'Show' : 'Hide';
+}
+
+function copyText(text, btn) {
+  navigator.clipboard.writeText(text).then(() => {
+    const orig = btn.textContent;
+    btn.textContent = '✓';
+    btn.style.color = 'var(--success)';
+    setTimeout(() => { btn.textContent = orig; btn.style.color = ''; }, 1500);
+  });
+}
+
+function genPassword() {
+  const chars = 'abcdefghijkmnpqrstuvwxyz23456789@#!';
+  const pw = Array.from({length:10}, () => chars[Math.floor(Math.random()*chars.length)]).join('');
+  document.getElementById('newPwField').value = pw;
+}
+function genPasswordReset() {
+  const chars = 'abcdefghijkmnpqrstuvwxyz23456789@#!';
+  const pw = Array.from({length:10}, () => chars[Math.floor(Math.random()*chars.length)]).join('');
+  document.getElementById('resetPwInput').value = pw;
+}
+
+function openResetPw(uid, username) {
+  document.getElementById('resetPwForm').action = '/users/reset_password/' + uid;
+  document.getElementById('resetPwUsername').textContent = username;
+  document.getElementById('resetPwInput').value = '';
+  openModal('resetPwModal');
+}
+function openEditUser(id, name, cls) {
+  document.getElementById('editUserForm').action = '/users/edit/' + id;
+  document.getElementById('euName').value = name;
+  document.getElementById('euClass').value = cls;
+  openModal('editUserModal');
+}
+function toggleClassField(role) {
+  document.getElementById('addClassField').style.display = role === 'teacher' ? '' : 'none';
+}
+
+function toggleRoleGroup(master) {
+  const tbody = master.closest('table').querySelector('tbody');
+  tbody.querySelectorAll('.row-check:not(:disabled)').forEach(cb => {
+    cb.checked = master.checked;
+    master.checked ? selectedIds.add(cb.value) : selectedIds.delete(cb.value);
+    highlightRow(cb.value, cb.checked);
+  });
+  updateSelectionUI();
+}
+function selectAll() {
+  const cbs = document.querySelectorAll('.row-check:not(:disabled)');
+  const allOn = [...cbs].every(cb => cb.checked);
+  cbs.forEach(cb => { cb.checked = !allOn; !allOn ? selectedIds.add(cb.value) : selectedIds.delete(cb.value); highlightRow(cb.value, !allOn); });
+  updateSelectionUI();
+}
+function updateSelection() {
+  selectedIds.clear();
+  document.querySelectorAll('.row-check:checked').forEach(cb => selectedIds.add(cb.value));
+  document.querySelectorAll('.row-check').forEach(cb => highlightRow(cb.value, cb.checked));
+  updateSelectionUI();
+}
+function highlightRow(id, on) {
+  const row = document.getElementById('urow-' + id);
+  if (row) row.style.background = on ? '#eff6ff' : '';
+}
+function updateSelectionUI() {
+  const n = selectedIds.size;
+  const btn = document.getElementById('bulkDelBtn');
+  btn.disabled = n === 0;
+  btn.textContent = n > 0 ? 'Delete Selected (' + n + ')' : 'Delete Selected';
+}
+function bulkDeleteUsers() {
+  if (!selectedIds.size) return;
+  if (!confirm('Delete ' + selectedIds.size + ' user(s)?')) return;
+  selectedIds.forEach(id => {
+    const f = document.createElement('form');
+    f.method = 'POST'; f.action = '/users/delete/' + id;
+    document.getElementById('bulkForms').appendChild(f);
+    f.submit();
+  });
+}
+
+// Load classes from API
+(async () => {
+  try {
+    const r = await fetch('/api/classes');
+    const names = await r.json();
+    ['addUserClass','euClass'].forEach(sid => {
+      const sel = document.getElementById(sid);
+      if (!sel) return;
+      const cur = sel.value;
+      sel.innerHTML = '<option value="">— None —</option>' + names.map(n=>`<option value="${n}" ${n===cur?'selected':''}>${n}</option>`).join('');
+    });
+  } catch(e) {}
+})();
+</script>
+{% endblock %}

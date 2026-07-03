@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+{% block title %}Classes — {{ school_name }}{% endblock %}
+{% block page_title %}Class Management{% endblock %}
+{% block content %}
+<div class="top-actions">
+  <div class="ta-left">
+    <h2>Manage Classes</h2>
+    <p class="sub-text">Add, rename, or delete classes. Renaming updates all related records automatically.</p>
+  </div>
+  <div class="btn-group">
+    <button class="btn btn-outline btn-sm" onclick="selectAll()">☑ Select All</button>
+    <form method="POST" action="{{ url_for('delete_classes') }}" id="bulkDeleteForm" onsubmit="return confirmBulkDelete()">
+      <div id="hiddenIds"></div>
+      <button type="submit" class="btn btn-danger btn-sm" id="bulkDelBtn" disabled>Delete Selected</button>
+    </form>
+    <button class="btn btn-primary" onclick="openModal('addClassModal')">+ Add Class</button>
+  </div>
+</div>
+
+<div class="grid-2" style="margin-bottom:20px">
+  {% for c in classes %}
+  <div class="class-card" id="ccard-{{ c.id }}">
+    <div class="cc-check">
+      <input type="checkbox" class="row-check" value="{{ c.id }}" onchange="updateSelection()" style="width:16px;height:16px;cursor:pointer">
+    </div>
+    <div class="cc-icon">🏫</div>
+    <div class="cc-info">
+      <div class="cc-name">{{ c.name }}</div>
+      {% if c.section %}<div class="cc-section">{{ c.section }}</div>{% endif %}
+      <div class="cc-count"><strong>{{ c.student_count }}</strong> students enrolled</div>
+    </div>
+    <div class="cc-actions">
+      <button class="btn btn-xs btn-outline" onclick="openEditClass({{ c.id }}, '{{ c.name }}', '{{ c.section or '' }}')">Edit</button>
+      <form method="POST" action="{{ url_for('delete_classes') }}" style="display:inline"
+            onsubmit="return confirm('Delete class {{ c.name }}? Students and subjects will NOT be deleted, but their class reference will remain.')">
+        <input type="hidden" name="selected_ids" value="{{ c.id }}">
+        <button type="submit" class="btn btn-xs btn-danger">Delete</button>
+      </form>
+    </div>
+  </div>
+  {% else %}
+  <div class="card" style="grid-column:1/-1">
+    <div class="empty-state"><div class="ei">🏫</div><p>No classes yet. Add your first class.</p></div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- How to use info box -->
+<div class="card">
+  <div class="card-hd"><h3>💡 How Classes Work</h3></div>
+  <div style="padding:16px 20px;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px">
+    <div class="info-tip">
+      <div class="it-icon">➕</div>
+      <div><strong>Adding a class</strong><br><span class="sub-text">Creates a new class you can assign students, subjects and teachers to.</span></div>
+    </div>
+    <div class="info-tip">
+      <div class="it-icon">✏️</div>
+      <div><strong>Renaming a class</strong><br><span class="sub-text">All students, subjects, diary entries and teacher assignments update automatically.</span></div>
+    </div>
+    <div class="info-tip">
+      <div class="it-icon">🗑️</div>
+      <div><strong>Deleting a class</strong><br><span class="sub-text">Removes the class entry. Existing students keep their class label until reassigned.</span></div>
+    </div>
+    <div class="info-tip">
+      <div class="it-icon">📝</div>
+      <div><strong>Naming convention</strong><br><span class="sub-text">Use format like 10-A, 9-B, 8-C. Names are auto-uppercased.</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- Add Class Modal -->
+<div class="modal-ov" id="addClassModal">
+  <div class="modal">
+    <div class="modal-hd"><h3>Add New Class</h3><button class="modal-x" onclick="closeModal('addClassModal')">✕</button></div>
+    <form method="POST" action="{{ url_for('add_class') }}" style="padding:20px 24px">
+      <div class="fgroup">
+        <label>Class Name</label>
+        <input type="text" name="name" required placeholder="e.g. 10-A, 9-C, 8-B, 11-Science"
+               style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase()">
+        <small>This will be used across students, subjects, attendance and marks.</small>
+      </div>
+      <div class="fgroup">
+        <label>Section / Notes <span class="text-muted">(optional)</span></label>
+        <input type="text" name="section" placeholder="e.g. Science Group, Arts Group">
+      </div>
+      <div class="modal-foot">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('addClassModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Add Class</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Edit Class Modal -->
+<div class="modal-ov" id="editClassModal">
+  <div class="modal">
+    <div class="modal-hd"><h3>Edit Class</h3><button class="modal-x" onclick="closeModal('editClassModal')">✕</button></div>
+    <form method="POST" id="editClassForm" style="padding:20px 24px">
+      <div class="fgroup">
+        <label>Class Name</label>
+        <input type="text" name="name" id="ecName" required oninput="this.value=this.value.toUpperCase()">
+        <small class="text-red">⚠️ Renaming will update ALL records: students, subjects, diary, teacher assignments.</small>
+      </div>
+      <div class="fgroup">
+        <label>Section / Notes <span class="text-muted">(optional)</span></label>
+        <input type="text" name="section" id="ecSection" placeholder="e.g. Science Group">
+      </div>
+      <div class="modal-foot">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('editClassModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Changes</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let selectedIds = new Set();
+
+function openEditClass(id, name, section) {
+  document.getElementById('editClassForm').action = '/classes/edit/' + id;
+  document.getElementById('ecName').value = name;
+  document.getElementById('ecSection').value = section;
+  openModal('editClassModal');
+}
+
+function selectAll() {
+  const cbs = document.querySelectorAll('.row-check');
+  const allChecked = [...cbs].every(cb => cb.checked);
+  cbs.forEach(cb => { cb.checked = !allChecked; !allChecked ? selectedIds.add(cb.value) : selectedIds.delete(cb.value); });
+  updateSelectionUI();
+}
+
+function updateSelection() {
+  selectedIds.clear();
+  document.querySelectorAll('.row-check:checked').forEach(cb => selectedIds.add(cb.value));
+  updateSelectionUI();
+}
+
+function updateSelectionUI() {
+  const n = selectedIds.size;
+  const btn = document.getElementById('bulkDelBtn');
+  btn.disabled = n === 0;
+  btn.textContent = n > 0 ? 'Delete Selected (' + n + ')' : 'Delete Selected';
+  document.querySelectorAll('.class-card').forEach(card => {
+    const cb = card.querySelector('.row-check');
+    card.style.borderColor = cb && cb.checked ? 'var(--primary-light)' : '';
+    card.style.background = cb && cb.checked ? '#eff6ff' : '';
+  });
+}
+
+function confirmBulkDelete() {
+  if (selectedIds.size === 0) return false;
+  if (!confirm('Delete ' + selectedIds.size + ' class(es)?')) return false;
+  const container = document.getElementById('hiddenIds');
+  container.innerHTML = '';
+  selectedIds.forEach(id => {
+    const inp = document.createElement('input');
+    inp.type = 'hidden'; inp.name = 'selected_ids'; inp.value = id;
+    container.appendChild(inp);
+  });
+  return true;
+}
+</script>
+{% endblock %}

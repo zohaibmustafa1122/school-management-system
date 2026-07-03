@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+{% block title %}Subjects — {{ school_name }}{% endblock %}
+{% block page_title %}Subjects{% endblock %}
+{% block content %}
+<div class="top-actions">
+  <form method="GET" class="search-bar">
+    {% if session.role=='admin' %}
+    <select name="class" onchange="this.form.submit()">
+      <option value="">All Classes</option>
+      {% for c in classes %}<option value="{{ c.class }}" {% if cls_filter==c.class %}selected{% endif %}>{{ c.class }}</option>{% endfor %}
+    </select>
+    {% endif %}
+  </form>
+  <div class="btn-group">
+    <button class="btn btn-outline btn-sm" onclick="selectAll()">☑ Select All</button>
+    <form method="POST" action="{{ url_for('delete_subjects') }}" id="bulkDeleteForm" onsubmit="return confirmBulkDelete()">
+      <div id="hiddenIds"></div>
+      <button type="submit" class="btn btn-danger btn-sm" id="bulkDelBtn" disabled>Delete Selected</button>
+    </form>
+    <button class="btn btn-primary" onclick="openModal('addSubjModal')">+ Add Subject</button>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-hd">
+    <h3>Subjects <span class="badge bb" id="selCount">{{ subjects|length }} total</span></h3>
+    <div class="text-muted" style="font-size:12px">Select checkboxes for bulk delete, or use Edit/Delete per row</div>
+  </div>
+  {% if subjects %}
+  <div class="tw">
+    <table class="tbl">
+      <thead>
+        <tr>
+          <th style="width:44px"><input type="checkbox" id="masterCheck" onchange="toggleAll(this)" style="width:16px;height:16px;cursor:pointer"></th>
+          <th>#</th><th>Subject Name</th><th>Class</th><th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for s in subjects %}
+      <tr id="row-{{ s.id }}">
+        <td><input type="checkbox" class="row-check" value="{{ s.id }}" onchange="updateSelection()" style="width:16px;height:16px;cursor:pointer"></td>
+        <td class="text-muted">{{ loop.index }}</td>
+        <td>
+          <span id="sn-{{ s.id }}"><strong>{{ s.subject_name }}</strong></span>
+          <span id="edit-{{ s.id }}" style="display:none">
+            <form method="POST" action="{{ url_for('edit_subject', sub_id=s.id) }}" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+              <input type="text" name="subject_name" value="{{ s.subject_name }}" style="padding:5px 10px;border:1.5px solid var(--primary-light);border-radius:6px;font-family:inherit;font-size:13px;width:160px">
+              <select name="class" style="padding:5px 10px;border:1.5px solid var(--primary-light);border-radius:6px;font-family:inherit;font-size:13px">
+                {% for c in classes %}<option value="{{ c.class }}" {% if s.class==c.class %}selected{% endif %}>{{ c.class }}</option>{% endfor %}
+              </select>
+              <button type="submit" class="btn btn-xs btn-primary">Save</button>
+              <button type="button" class="btn btn-xs btn-ghost" onclick="cancelEdit('{{ s.id }}')">✕</button>
+            </form>
+          </span>
+        </td>
+        <td><span class="cls-badge">{{ s.class }}</span></td>
+        <td>
+          <button class="btn btn-xs btn-outline" onclick="startEdit('{{ s.id }}')">Edit</button>
+          <form method="POST" action="{{ url_for('delete_subject', sub_id=s.id) }}" style="display:inline"
+                onsubmit="return confirm('Delete {{ s.subject_name }}? Related marks will also be deleted.')">
+            <button type="submit" class="btn btn-xs btn-danger">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state"><div class="ei">📚</div><p>No subjects found.</p></div>
+  {% endif %}
+</div>
+
+<div class="modal-ov" id="addSubjModal">
+  <div class="modal">
+    <div class="modal-hd"><h3>Add New Subject</h3><button class="modal-x" onclick="closeModal('addSubjModal')">✕</button></div>
+    <form method="POST" action="{{ url_for('add_subject') }}" style="padding:20px 24px">
+      <div class="fgroup"><label>Subject Name</label><input type="text" name="subject_name" required placeholder="e.g. Chemistry, Islamiat, Computer Science"></div>
+      <div class="fgroup">
+        <label>Class</label>
+        {% if session.role=='teacher' %}
+        <input type="text" name="class" value="{{ session.class_assigned }}" readonly style="background:#f8fafc">
+        {% else %}
+        <select name="class" required>
+          <option value="">— Select Class —</option>
+          {% for c in classes %}<option value="{{ c.class }}">{{ c.class }}</option>{% endfor %}
+        </select>
+        {% endif %}
+      </div>
+      <div class="modal-foot">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('addSubjModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Add Subject</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+let selectedIds = new Set();
+function toggleAll(master) {
+  document.querySelectorAll('.row-check').forEach(cb => { cb.checked = master.checked; master.checked ? selectedIds.add(cb.value) : selectedIds.delete(cb.value); });
+  updateSelectionUI();
+}
+function selectAll() {
+  const cbs = document.querySelectorAll('.row-check');
+  const allChecked = [...cbs].every(cb => cb.checked);
+  cbs.forEach(cb => { cb.checked = !allChecked; !allChecked ? selectedIds.add(cb.value) : selectedIds.delete(cb.value); });
+  document.getElementById('masterCheck').checked = !allChecked;
+  updateSelectionUI();
+}
+function updateSelection() {
+  selectedIds.clear();
+  document.querySelectorAll('.row-check:checked').forEach(cb => selectedIds.add(cb.value));
+  const all = document.querySelectorAll('.row-check').length;
+  document.getElementById('masterCheck').checked = selectedIds.size === all && all > 0;
+  updateSelectionUI();
+}
+function updateSelectionUI() {
+  const n = selectedIds.size;
+  const btn = document.getElementById('bulkDelBtn');
+  btn.disabled = n === 0;
+  btn.textContent = n > 0 ? 'Delete Selected (' + n + ')' : 'Delete Selected';
+  document.getElementById('selCount').textContent = n > 0 ? n + ' selected' : '{{ subjects|length }} total';
+}
+function confirmBulkDelete() {
+  if (selectedIds.size === 0) return false;
+  if (!confirm('Delete ' + selectedIds.size + ' subject(s)? All related marks will also be deleted.')) return false;
+  const container = document.getElementById('hiddenIds');
+  container.innerHTML = '';
+  selectedIds.forEach(id => { const inp = document.createElement('input'); inp.type='hidden'; inp.name='selected_ids'; inp.value=id; container.appendChild(inp); });
+  return true;
+}
+function startEdit(id) {
+  document.getElementById('sn-'+id).style.display = 'none';
+  document.getElementById('edit-'+id).style.display = 'inline';
+  document.getElementById('row-'+id).style.background = '#eff6ff';
+}
+function cancelEdit(id) {
+  document.getElementById('sn-'+id).style.display = '';
+  document.getElementById('edit-'+id).style.display = 'none';
+  document.getElementById('row-'+id).style.background = '';
+}
+</script>
+
+// Refresh class dropdowns from API
+(async () => {
+  try {
+    const r = await fetch('/api/classes');
+    const names = await r.json();
+    document.querySelectorAll('select[name="class"], select[name="class_assigned"]').forEach(sel => {
+      const cur = sel.value;
+      const opts = [...sel.options];
+      const firstOpt = opts[0] ? opts[0].outerHTML : '';
+      sel.innerHTML = firstOpt + names.map(n=>`<option value="${n}" ${n===cur?'selected':''}>${n}</option>`).join('');
+    });
+  } catch(e) {}
+})();
+{% endblock %}

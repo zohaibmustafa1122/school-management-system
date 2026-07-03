@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Sign In — {{ school_name }}{% endblock %}
+{% block auth %}
+<div class="login-wrap">
+  <div class="login-panel">
+    <div class="login-brand">
+      <div class="login-logo">{{ school_short }}</div>
+      <h1>{{ school_name }}</h1>
+      <p>Integrated School Management System</p>
+    </div>
+    <div class="login-divider"></div>
+    <div class="login-form-area">
+      <h2>Sign In</h2>
+      <p class="login-sub">Enter your credentials to continue</p>
+      {% if error %}<div class="toast toast-error" style="margin-bottom:16px"><svg viewBox="0 0 24 24" width="16"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>{{ error }}</div>{% endif %}
+      <form method="POST">
+        <div class="fgroup">
+          <label>Username</label>
+          <input type="text" name="username" placeholder="Your username" required autofocus>
+        </div>
+        <div class="fgroup">
+          <label>Password</label>
+          <input type="password" name="password" placeholder="Your password" required>
+        </div>
+        <button type="submit" class="btn-signin">Sign In →</button>
+      </form>
+    </div>
+    <div class="login-creds">
+      <div class="creds-title">Demo Accounts</div>
+      <div class="creds-grid">
+        <div><strong>Admin</strong><br><code>admin</code> / <code>admin123</code></div>
+        <div><strong>Teacher</strong><br><code>teacher1</code> / <code>teacher123</code></div>
+        <div><strong>Student</strong><br><code>student_001</code> / <code>student123</code></div>
+      </div>
+    </div>
+  </div>
+  <div class="login-visual">
+    <div class="visual-content">
+      <div class="visual-stat"><span>3</span><label>Role Levels</label></div>
+      <div class="visual-stat"><span>6+</span><label>Modules</label></div>
+      <div class="visual-stat"><span>PDF</span><label>Reports</label></div>
+      <div class="visual-stat"><span>Live</span><label>Charts</label></div>
+    </div>
+    <div class="visual-title">Complete School Management</div>
+    <div class="visual-sub">Attendance · Marks · Progress · ClassBoard · Reports</div>
+  </div>
+</div>
+{% endblock %}

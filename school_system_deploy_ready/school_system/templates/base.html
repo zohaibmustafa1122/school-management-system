@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}{{ school_name }}{% endblock %}</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="role-{{ session.get('role','guest') }}">
+
+{% if session.user_id %}
+{% set role = session.get('role') %}
+
+<nav class="sidebar" id="sidebar">
+  <div class="sidebar-top">
+    <div class="brand">
+      <div class="brand-logo">{{ school_short }}</div>
+      <div class="brand-text">
+        <div class="brand-name">{{ school_name }}</div>
+        <div class="brand-tagline">Management System</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="nav-body">
+    {% if role == 'admin' %}
+    <div class="nav-group">
+      <div class="nav-group-label">Overview</div>
+      <a href="{{ url_for('dashboard') }}" class="nav-item {% if request.endpoint=='dashboard' %}active{% endif %}">
+        <svg class="ni" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        Dashboard
+      </a>
+    </div>
+    <div class="nav-group">
+      <div class="nav-group-label">Management</div>
+      <a href="{{ url_for('users') }}" class="nav-item {% if request.endpoint in ['users'] %}active{% endif %}">
+        <svg class="ni" viewBox="0 0 24 24"><circle cx="9" cy="7" r="4"/><path d="M3 21v-2a4 4 0 014-4h4a4 4 0 014 4v2"/><path d="M16 3a4 4 0 010 8"/><path d="M21 21v-2a4 4 0 00-3-3.87"/></svg>
+        User Accounts
+      </a>
+      <a href="{{ url_for('students') }}" class="nav-item {% if request.endpoint in ['students','add_student'] %}active{% endif %}">
+        <svg class="ni" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
+        Students
+      </a>
+      <a href="{{ url_for('subjects') }}" class="nav-item {% if request.endpoint=='subjects' %}active{% endif %}">
+        <svg class="ni" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
+        Subjects
+      </a>
+      <a href="{{ url_for('classes') }}" class="nav-item {% if request.endpoint in ['classes','add_class','edit_class'] %}active{% endif %}">
+        <svg class="ni" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
+        Classes
+      </a>
+    </div>
+    <div class="nav-group">
+      <div class="nav-group-label">Academic</div>
+      <a href="{{ url_for('attendance') }}" class="nav-item {% if request.endpoint in ['attendance','submit_attendance'] %}active{% endif %}">
+        <svg class="ni" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+        Attendance
+      </a>
+      <a href="{{ url_for('marks') }}" class="nav-item {% if request.endpoint in ['marks','save_marks'] %}active{% endif %}">
+        <svg class="ni" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        Marks Portal
+      </a>
+      <a href="{{ url_for('progress') }}" class="nav-item {% if request.endpoint=='progress' %}active{% endif %}">
+        <svg class="ni" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        Student Progress
+      </a>
+      <a href="{{ url_for('classboard') }}" class="nav-item {% if request.endpoint in ['classboard','add_diary'] %}active{% endif %}">
+        <svg class="ni" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        ClassBoard
+      </a>
+      <a href="{{ url_for('reports') }}" class="nav-item {% if request.endpoint=='reports' %}active{% endif %}">
+        <svg class="ni" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+        Reports
+      </a>
+      <a href="{{ url_for('fees') }}" class="nav-item {% if request.endpoint in ['fees','add_fee','edit_fee'] %}active{% endif %}">
+        <svg class="ni" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+        Fees
+      </a>
+    </div>
+
+    {% elif role == 'teacher' %}
+    <div class="nav-group">
+      <div class="nav-group-label">My Class: {{ session.get('class_assigned','') }}</div>
+      <a href="{{ url_for('dashboard') }}" class="nav-item {% if request.endpoint=='dashboard' %}active{% endif %}">
+        <svg class="ni" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        Dashboard
+      </a>
+      <a href="{{ url_for('students') }}" class="nav-item {% if request.endpoint=='students' %}active{% endif %}">
+        <svg class="ni" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+        My Students
+      </a>
+      <a href="{{ url_for('attendance') }}" class="nav-item {% if request.endpoint=='attendance' %}active{% endif %}">
+        <svg class="ni" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+        Attendance
+      </a>
+      <a href="{{ url_for('marks') }}" class="nav-item {% if request.endpoint=='marks' %}active{% endif %}">
+        <svg class="ni" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        Marks Portal
+      </a>
+      <a href="{{ url_for('progress') }}" class="nav-item {% if request.endpoint=='progress' %}active{% endif %}">
+        <svg class="ni" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        Student Progress
+      </a>
+      <a href="{{ url_for('classboard') }}" class="nav-item {% if request.endpoint=='classboard' %}active{% endif %}">
+        <svg class="ni" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        ClassBoard
+      </a>
+      <a href="{{ url_for('subjects') }}" class="nav-item {% if request.endpoint=='subjects' %}active{% endif %}">
+        <svg class="ni" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
+        Subjects
+      </a>
+      <a href="{{ url_for('reports') }}" class="nav-item {% if request.endpoint=='reports' %}active{% endif %}">
+        <svg class="ni" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        Reports
+      </a>
+    </div>
+
+    {% else %}{# student #}
+    <div class="nav-group">
+      <div class="nav-group-label">My Portal</div>
+      <a href="{{ url_for('dashboard') }}" class="nav-item {% if request.endpoint=='dashboard' %}active{% endif %}">
+        <svg class="ni" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        Dashboard
+      </a>
+      <a href="{{ url_for('student_attendance') }}" class="nav-item {% if request.endpoint=='student_attendance' %}active{% endif %}">
+        <svg class="ni" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/></svg>
+        My Attendance
+      </a>
+      <a href="{{ url_for('student_marks') }}" class="nav-item {% if request.endpoint=='student_marks' %}active{% endif %}">
+        <svg class="ni" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        My Marks
+      </a>
+      <a href="{{ url_for('student_progress') }}" class="nav-item {% if request.endpoint=='student_progress' %}active{% endif %}">
+        <svg class="ni" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        My Progress
+      </a>
+      <a href="{{ url_for('classboard') }}" class="nav-item {% if request.endpoint=='classboard' %}active{% endif %}">
+        <svg class="ni" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/></svg>
+        ClassBoard
+      </a>
+      <a href="{{ url_for('fees') }}" class="nav-item {% if request.endpoint=='fees' %}active{% endif %}">
+        <svg class="ni" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+        My Fees
+      </a>
+      {% if session.student_id %}
+      <a href="{{ url_for('student_report_pdf', sid=session.student_id) }}" class="nav-item" target="_blank">
+        <svg class="ni" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        My Report
+      </a>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="sidebar-foot">
+    <div class="user-pill">
+      <div class="user-av {{ role }}">{{ session.full_name[0]|upper if session.full_name else 'U' }}</div>
+      <div class="user-info">
+        <div class="user-name">{{ session.full_name or session.username }}</div>
+        <div class="user-role-badge role-{{ role }}">{{ role|title }}</div>
+      </div>
+    </div>
+    <a href="{{ url_for('logout') }}" class="sign-out-btn" title="Sign out">
+      <svg viewBox="0 0 24 24" width="16" height="16"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+    </a>
+  </div>
+</nav>
+
+<div class="main-wrap">
+  <header class="topbar">
+    <button class="hamburger" id="hamburger" onclick="toggleSidebar()">
+      <svg viewBox="0 0 24 24" width="20" height="20"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </button>
+    <div class="topbar-title">{% block page_title %}{% endblock %}</div>
+    <div class="topbar-right">
+      <div class="topbar-date">{{ now.strftime('%a, %d %b %Y') }}</div>
+    </div>
+  </header>
+
+  <main class="page-content">
+    {% with msgs = get_flashed_messages(with_categories=true) %}
+      {% for cat, msg in msgs %}
+      <div class="toast toast-{{ cat }}">
+        {% if cat=='success' %}<svg viewBox="0 0 24 24" width="16"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>{% else %}<svg viewBox="0 0 24 24" width="16"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>{% endif %}
+        {{ msg }}
+        <button onclick="this.parentElement.remove()">✕</button>
+      </div>
+      {% endfor %}
+    {% endwith %}
+
+    {% block content %}{% endblock %}
+  </main>
+</div>
+
+{% else %}
+{% block auth %}{% endblock %}
+{% endif %}
+
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

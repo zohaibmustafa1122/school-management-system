@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Admin Dashboard — {{ school_name }}{% endblock %}
+{% block page_title %}Admin Dashboard{% endblock %}
+{% block content %}
+<div class="stats-row">
+  <div class="scard blue"><div class="scard-icon">👥</div><div class="scard-val">{{ total_students }}</div><div class="scard-lbl">Total Students</div></div>
+  <div class="scard green"><div class="scard-icon">🏫</div><div class="scard-val">{{ class_stats|length }}</div><div class="scard-lbl">Classes</div></div>
+  <div class="scard amber"><div class="scard-icon">👩‍🏫</div><div class="scard-val">{{ total_teachers }}</div><div class="scard-lbl">Teachers</div></div>
+  <div class="scard purple"><div class="scard-icon">📊</div><div class="scard-val">{{ class_stats|map(attribute='avg_marks')|list|sum // class_stats|length if class_stats else 0 }}%</div><div class="scard-lbl">Avg Marks</div></div>
+</div>
+
+<div class="grid-2">
+  <div class="card">
+    <div class="card-hd"><h3>Class Performance Overview</h3></div>
+    <div class="chart-box"><canvas id="classChart"></canvas></div>
+  </div>
+  <div class="card">
+    <div class="card-hd"><h3>Attendance by Class</h3></div>
+    <div class="chart-box"><canvas id="attChart"></canvas></div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-hd">
+    <h3>Class Summary</h3>
+    <a href="{{ url_for('students') }}" class="btn btn-sm btn-outline">View All Students</a>
+  </div>
+  <div class="tw">
+    <table class="tbl">
+      <thead><tr><th>Class</th><th>Students</th><th>Avg Marks %</th><th>Avg Attendance %</th><th>Marks Status</th><th>Actions</th></tr></thead>
+      <tbody>
+      {% for c in class_stats %}
+      <tr>
+        <td><span class="cls-badge">{{ c.class }}</span></td>
+        <td>{{ c.students }}</td>
+        <td>
+          <div class="prog-wrap"><div class="prog {{ 'pg-green' if c.avg_marks>=60 else 'pg-red' }}" style="width:{{ c.avg_marks }}%"></div></div>
+          <strong>{{ c.avg_marks }}%</strong>
+        </td>
+        <td>
+          <div class="prog-wrap"><div class="prog {{ 'pg-green' if c.avg_att>=75 else 'pg-red' }}" style="width:{{ c.avg_att }}%"></div></div>
+          <strong>{{ c.avg_att }}%</strong>
+        </td>
+        <td><span class="badge {{ 'bg' if c.avg_marks>=60 else 'br' }}">{{ 'Good' if c.avg_marks>=60 else 'Needs Attention' }}</span></td>
+        <td>
+          <a href="{{ url_for('progress', **{'class':c.class}) }}" class="btn btn-xs btn-outline">Progress</a>
+          <a href="{{ url_for('reports', **{'class':c.class}) }}" class="btn btn-xs btn-outline">Report</a>
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const labels = {{ class_stats|map(attribute='class')|list|tojson }};
+const marks  = {{ class_stats|map(attribute='avg_marks')|list|tojson }};
+const atts   = {{ class_stats|map(attribute='avg_att')|list|tojson }};
+const colors = ['#3b82f6','#10b981','#f59e0b','#8b5cf6','#ef4444','#06b6d4'];
+
+new Chart(document.getElementById('classChart'),{type:'bar',data:{labels,datasets:[{label:'Avg Marks %',data:marks,backgroundColor:colors,borderRadius:8}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,max:100,ticks:{callback:v=>v+'%'},grid:{color:'#f1f5f9'}},x:{grid:{display:false}}}}});
+new Chart(document.getElementById('attChart'),{type:'doughnut',data:{labels,datasets:[{data:atts,backgroundColor:colors,borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'}}}});
+</script>
+{% endblock %}
